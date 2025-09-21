@@ -1,0 +1,302 @@
+#include "neoc/protocol/json_rpc.h"
+#include <stdlib.h>
+#include <string.h>
+
+// Stub implementation when CURL and cJSON are not available
+
+struct neoc_rpc_client_t {
+    neoc_rpc_config_t config;
+};
+
+neoc_error_t neoc_rpc_client_create(neoc_rpc_client_t** client,
+                                     const neoc_rpc_config_t* config) {
+    if (!client || !config || !config->url) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+    }
+    
+    *client = calloc(1, sizeof(neoc_rpc_client_t));
+    if (!*client) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate RPC client");
+    }
+    
+    // Copy configuration
+    (*client)->config = *config;
+    (*client)->config.url = strdup(config->url);
+    if (!(*client)->config.url) {
+        free(*client);
+        *client = NULL;
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to copy URL");
+    }
+    
+    // Set defaults
+    if ((*client)->config.timeout_ms == 0) {
+        (*client)->config.timeout_ms = 30000; // 30 seconds
+    }
+    if ((*client)->config.max_retries == 0) {
+        (*client)->config.max_retries = 3;
+    }
+    if ((*client)->config.block_interval_ms == 0) {
+        (*client)->config.block_interval_ms = 15000; // 15 seconds
+    }
+    if ((*client)->config.polling_interval_ms == 0) {
+        (*client)->config.polling_interval_ms = 1000; // 1 second
+    }
+    if ((*client)->config.max_valid_until_block_increment == 0) {
+        (*client)->config.max_valid_until_block_increment = 5760; // ~24 hours
+    }
+    
+    return NEOC_SUCCESS;
+}
+
+void neoc_rpc_client_free(neoc_rpc_client_t* client) {
+    if (!client) return;
+    
+    if (client->config.url) {
+        free(client->config.url);
+    }
+    
+    free(client);
+}
+
+neoc_error_t neoc_rpc_set_header(neoc_rpc_client_t* client,
+                                  const char* key,
+                                  const char* value) {
+    (void)client;
+    (void)key;
+    (void)value;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_send_request(neoc_rpc_client_t* client,
+                                    const neoc_rpc_request_t* request,
+                                    neoc_rpc_response_t** response) {
+    (void)client;
+    (void)request;
+    (void)response;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+void neoc_rpc_response_free(neoc_rpc_response_t* response) {
+    if (!response) return;
+    
+    if (response->result) free(response->result);
+    if (response->error_message) free(response->error_message);
+    if (response->raw_response) free(response->raw_response);
+    
+    free(response);
+}
+
+// Blockchain Methods
+
+neoc_error_t neoc_rpc_get_best_block_hash(neoc_rpc_client_t* client,
+                                           neoc_hash256_t* hash) {
+    (void)client;
+    (void)hash;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_get_block_hash(neoc_rpc_client_t* client,
+                                      uint32_t index,
+                                      neoc_hash256_t* hash) {
+    (void)client;
+    (void)index;
+    (void)hash;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_get_block(neoc_rpc_client_t* client,
+                                 const neoc_hash256_t* hash,
+                                 bool full_tx,
+                                 neoc_block_t** block) {
+    (void)client;
+    (void)hash;
+    (void)full_tx;
+    (void)block;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_get_block_count(neoc_rpc_client_t* client,
+                                       uint32_t* count) {
+    (void)client;
+    (void)count;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_get_transaction(neoc_rpc_client_t* client,
+                                       const neoc_hash256_t* hash,
+                                       neoc_transaction_info_t** tx) {
+    (void)client;
+    (void)hash;
+    (void)tx;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t* client,
+                                          const neoc_hash160_t* hash,
+                                          neoc_contract_state_t** state) {
+    (void)client;
+    (void)hash;
+    (void)state;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_get_storage(neoc_rpc_client_t* client,
+                                   const neoc_hash160_t* contract,
+                                   const char* key,
+                                   char** value) {
+    (void)client;
+    (void)contract;
+    (void)key;
+    (void)value;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+// Node Methods
+
+neoc_error_t neoc_rpc_get_version(neoc_rpc_client_t* client,
+                                   neoc_version_info_t** version) {
+    (void)client;
+    (void)version;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_get_connection_count(neoc_rpc_client_t* client,
+                                            uint32_t* count) {
+    (void)client;
+    (void)count;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_send_raw_transaction(neoc_rpc_client_t* client,
+                                            const char* tx_hex,
+                                            neoc_hash256_t* tx_hash) {
+    (void)client;
+    (void)tx_hex;
+    (void)tx_hash;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+// Smart Contract Methods
+
+neoc_error_t neoc_rpc_invoke_function(neoc_rpc_client_t* client,
+                                       const neoc_hash160_t* contract,
+                                       const char* method,
+                                       const char* params_json,
+                                       const char* signers_json,
+                                       neoc_invocation_result_t** result) {
+    (void)client;
+    (void)contract;
+    (void)method;
+    (void)params_json;
+    (void)signers_json;
+    (void)result;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_invoke_script(neoc_rpc_client_t* client,
+                                     const char* script_hex,
+                                     const char* signers_json,
+                                     neoc_invocation_result_t** result) {
+    (void)client;
+    (void)script_hex;
+    (void)signers_json;
+    (void)result;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+// NEP-17 Token Methods
+
+neoc_error_t neoc_rpc_get_nep17_balances(neoc_rpc_client_t* client,
+                                          const neoc_hash160_t* account,
+                                          char** balances_json) {
+    (void)client;
+    (void)account;
+    (void)balances_json;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_get_nep17_transfers(neoc_rpc_client_t* client,
+                                           const neoc_hash160_t* account,
+                                           uint64_t from_timestamp,
+                                           uint64_t to_timestamp,
+                                           char** transfers_json) {
+    (void)client;
+    (void)account;
+    (void)from_timestamp;
+    (void)to_timestamp;
+    (void)transfers_json;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+// Utility functions
+
+neoc_error_t neoc_rpc_validate_address(neoc_rpc_client_t* client,
+                                        const char* address,
+                                        bool* is_valid) {
+    (void)client;
+    (void)address;
+    (void)is_valid;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+neoc_error_t neoc_rpc_calculate_network_fee(neoc_rpc_client_t* client,
+                                             const char* tx_hex,
+                                             uint64_t* fee) {
+    (void)client;
+    (void)tx_hex;
+    (void)fee;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "RPC support not compiled");
+}
+
+// Helper functions to free structures
+
+void neoc_block_free(neoc_block_t* block) {
+    if (!block) return;
+    
+    if (block->tx_hashes) free(block->tx_hashes);
+    if (block->witness_json) free(block->witness_json);
+    
+    free(block);
+}
+
+void neoc_transaction_info_free(neoc_transaction_info_t* tx) {
+    if (!tx) return;
+    
+    if (tx->script) free(tx->script);
+    if (tx->signers_json) free(tx->signers_json);
+    if (tx->witnesses_json) free(tx->witnesses_json);
+    if (tx->attributes_json) free(tx->attributes_json);
+    
+    free(tx);
+}
+
+void neoc_contract_state_free(neoc_contract_state_t* state) {
+    if (!state) return;
+    
+    if (state->nef_json) free(state->nef_json);
+    if (state->manifest_json) free(state->manifest_json);
+    
+    free(state);
+}
+
+void neoc_invocation_result_free(neoc_invocation_result_t* result) {
+    if (!result) return;
+    
+    if (result->script) free(result->script);
+    if (result->state) free(result->state);
+    if (result->exception) free(result->exception);
+    if (result->stack_json) free(result->stack_json);
+    if (result->notifications_json) free(result->notifications_json);
+    if (result->session_id) free(result->session_id);
+    if (result->diagnostics_json) free(result->diagnostics_json);
+    
+    free(result);
+}
+
+void neoc_version_info_free(neoc_version_info_t* version) {
+    if (!version) return;
+    
+    if (version->user_agent) free(version->user_agent);
+    
+    free(version);
+}

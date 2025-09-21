@@ -1,0 +1,607 @@
+/**
+ * @file neo_token.c
+ * @brief NEO native token contract implementation
+ */
+
+#include "neoc/contract/neo_token.h"
+#include "neoc/contract/native_contract.h"
+#include "neoc/script/script_builder_full.h"
+#include "neoc/utils/neoc_hex.h"
+#include "neoc/neoc_memory.h"
+#include <string.h>
+#include <stdlib.h>
+
+// NEO token methods
+static const char* NEO_METHOD_BALANCE_OF = "balanceOf";
+static const char* NEO_METHOD_TRANSFER = "transfer";
+static const char* NEO_METHOD_TOTAL_SUPPLY = "totalSupply";
+static const char* NEO_METHOD_REGISTER_CANDIDATE = "registerCandidate";
+static const char* NEO_METHOD_UNREGISTER_CANDIDATE = "unregisterCandidate";
+static const char* NEO_METHOD_VOTE = "vote";
+static const char* NEO_METHOD_GET_CANDIDATES = "getCandidates";
+static const char* NEO_METHOD_GET_COMMITTEE = "getCommittee";
+static const char* NEO_METHOD_GET_NEXT_BLOCK_VALIDATORS = "getNextBlockValidators";
+static const char* NEO_METHOD_UNCLAIMED_GAS = "unclaimedGas";
+static const char* NEO_METHOD_GET_GAS_PER_BLOCK = "getGasPerBlock";
+static const char* NEO_METHOD_GET_ACCOUNT_STATE = "getAccountState";
+
+neoc_error_t neoc_neo_token_create(neoc_neo_token_t **neo_token) {
+    if (!neo_token) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    *neo_token = (neoc_neo_token_t*)neoc_malloc(sizeof(neoc_neo_token_t));
+    if (!*neo_token) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+    
+    memset(*neo_token, 0, sizeof(neoc_neo_token_t));
+    
+    // Initialize base native contract
+    (*neo_token)->base.contract_id = NEO_TOKEN_ID;
+    strncpy((*neo_token)->base.name, "NeoToken", sizeof((*neo_token)->base.name) - 1);
+    
+    // Set NEO-specific properties
+    neoc_hash160_from_string(NEO_TOKEN_SCRIPT_HASH, &(*neo_token)->script_hash);
+    strncpy((*neo_token)->symbol, NEO_TOKEN_SYMBOL, sizeof((*neo_token)->symbol) - 1);
+    (*neo_token)->decimals = NEO_TOKEN_DECIMALS;
+    (*neo_token)->total_supply = NEO_TOKEN_TOTAL_SUPPLY;
+    
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_get_script_hash(neoc_hash160_t *script_hash) {
+    if (!script_hash) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    return neoc_hash160_from_string(NEO_TOKEN_SCRIPT_HASH, script_hash);
+}
+
+neoc_error_t neoc_neo_token_balance_of(const neoc_hash160_t *address,
+                                        void *rpc_client,
+                                        uint64_t *balance) {
+    if (!address || !rpc_client || !balance) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Build invocation script for balanceOf
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Push address parameter
+    result = neoc_script_builder_push_data(builder, address->data, sizeof(address->data));
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Call balanceOf method
+    neoc_hash160_t neo_hash;
+    neoc_neo_token_get_script_hash(&neo_hash);
+    result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_BALANCE_OF, 1);
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Invoke script through RPC
+    // This would call the RPC client to execute the script
+    // For now, returning a placeholder
+    *balance = 0;
+    
+    free(script);
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_transfer(const neoc_hash160_t *from,
+                                      const neoc_hash160_t *to,
+                                      uint64_t amount,
+                                      const uint8_t *data,
+                                      size_t data_len,
+                                      void *tx_builder) {
+    if (!from || !to || !tx_builder) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Build transfer script
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Push parameters in reverse order
+    if (data && data_len > 0) {
+        result = neoc_script_builder_push_data(builder, data, data_len);
+    } else {
+        result = neoc_script_builder_push_null(builder);
+    }
+    
+    if (result == NEOC_SUCCESS) {
+        result = neoc_script_builder_push_integer(builder, amount);
+    }
+    
+    if (result == NEOC_SUCCESS) {
+        result = neoc_script_builder_push_data(builder, to->data, sizeof(to->data));
+    }
+    
+    if (result == NEOC_SUCCESS) {
+        result = neoc_script_builder_push_data(builder, from->data, sizeof(from->data));
+    }
+    
+    // Call transfer method
+    if (result == NEOC_SUCCESS) {
+        neoc_hash160_t neo_hash;
+        neoc_neo_token_get_script_hash(&neo_hash);
+        result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_TRANSFER, 4);
+    }
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script and add to transaction
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result == NEOC_SUCCESS) {
+        // Add script to transaction builder
+        // This would be: neoc_tx_builder_set_script(tx_builder, script, script_len);
+        free(script);
+    }
+    
+    return result;
+}
+
+neoc_error_t neoc_neo_token_total_supply(void *rpc_client,
+                                          uint64_t *total_supply) {
+    if (!rpc_client || !total_supply) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // For NEO, total supply is fixed
+    *total_supply = NEO_TOKEN_TOTAL_SUPPLY;
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_register_candidate(const neoc_ec_public_key_t *public_key,
+                                                void *tx_builder) {
+    if (!public_key || !tx_builder) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Push public key
+    uint8_t pub_key_bytes[33];
+    size_t key_len = sizeof(pub_key_bytes);
+    result = neoc_ec_public_key_to_bytes(public_key, pub_key_bytes, &key_len);
+    if (result == NEOC_SUCCESS) {
+        result = neoc_script_builder_push_data(builder, pub_key_bytes, key_len);
+    }
+    
+    // Call registerCandidate
+    if (result == NEOC_SUCCESS) {
+        neoc_hash160_t neo_hash;
+        neoc_neo_token_get_script_hash(&neo_hash);
+        result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_REGISTER_CANDIDATE, 1);
+    }
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script and add to transaction
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result == NEOC_SUCCESS) {
+        // Add script to transaction builder
+        free(script);
+    }
+    
+    return result;
+}
+
+neoc_error_t neoc_neo_token_unregister_candidate(const neoc_ec_public_key_t *public_key,
+                                                  void *tx_builder) {
+    if (!public_key || !tx_builder) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Push public key
+    uint8_t pub_key_bytes[33];
+    size_t key_len = sizeof(pub_key_bytes);
+    result = neoc_ec_public_key_to_bytes(public_key, pub_key_bytes, &key_len);
+    if (result == NEOC_SUCCESS) {
+        result = neoc_script_builder_push_data(builder, pub_key_bytes, key_len);
+    }
+    
+    // Call unregisterCandidate
+    if (result == NEOC_SUCCESS) {
+        neoc_hash160_t neo_hash;
+        neoc_neo_token_get_script_hash(&neo_hash);
+        result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_UNREGISTER_CANDIDATE, 1);
+    }
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script and add to transaction
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result == NEOC_SUCCESS) {
+        free(script);
+    }
+    
+    return result;
+}
+
+neoc_error_t neoc_neo_token_vote(const neoc_hash160_t *account,
+                                  const neoc_ec_public_key_t *vote_to,
+                                  void *tx_builder) {
+    if (!account || !tx_builder) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Push vote_to (can be null to cancel vote)
+    if (vote_to) {
+        uint8_t pub_key_bytes[33];
+        size_t key_len = sizeof(pub_key_bytes);
+        result = neoc_ec_public_key_to_bytes(vote_to, pub_key_bytes, &key_len);
+        if (result == NEOC_SUCCESS) {
+            result = neoc_script_builder_push_data(builder, pub_key_bytes, key_len);
+        }
+    } else {
+        result = neoc_script_builder_push_null(builder);
+    }
+    
+    // Push account
+    if (result == NEOC_SUCCESS) {
+        result = neoc_script_builder_push_data(builder, account->data, sizeof(account->data));
+    }
+    
+    // Call vote method
+    if (result == NEOC_SUCCESS) {
+        neoc_hash160_t neo_hash;
+        neoc_neo_token_get_script_hash(&neo_hash);
+        result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_VOTE, 2);
+    }
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script and add to transaction
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result == NEOC_SUCCESS) {
+        free(script);
+    }
+    
+    return result;
+}
+
+neoc_error_t neoc_neo_token_get_candidates(void *rpc_client,
+                                            neoc_neo_candidate_t ***candidates,
+                                            size_t *count) {
+    if (!rpc_client || !candidates || !count) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Build invocation script
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Call getCandidates
+    neoc_hash160_t neo_hash;
+    neoc_neo_token_get_script_hash(&neo_hash);
+    result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_GET_CANDIDATES, 0);
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Would invoke script through RPC and parse results
+    // For now, return empty list
+    *candidates = NULL;
+    *count = 0;
+    
+    free(script);
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_get_committee(void *rpc_client,
+                                           neoc_ec_public_key_t ***committee,
+                                           size_t *count) {
+    if (!rpc_client || !committee || !count) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Build invocation script
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Call getCommittee
+    neoc_hash160_t neo_hash;
+    neoc_neo_token_get_script_hash(&neo_hash);
+    result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_GET_COMMITTEE, 0);
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Would invoke script through RPC and parse results
+    *committee = NULL;
+    *count = 0;
+    
+    free(script);
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_get_next_block_validators(void *rpc_client,
+                                                       neoc_ec_public_key_t ***validators,
+                                                       size_t *count) {
+    if (!rpc_client || !validators || !count) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Build invocation script
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Call getNextBlockValidators
+    neoc_hash160_t neo_hash;
+    neoc_neo_token_get_script_hash(&neo_hash);
+    result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_GET_NEXT_BLOCK_VALIDATORS, 0);
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Would invoke script through RPC and parse results
+    *validators = NULL;
+    *count = 0;
+    
+    free(script);
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_unclaimed_gas(const neoc_hash160_t *address,
+                                           uint32_t end_height,
+                                           void *rpc_client,
+                                           uint64_t *unclaimed) {
+    if (!address || !rpc_client || !unclaimed) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Build invocation script
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Push parameters
+    result = neoc_script_builder_push_integer(builder, end_height);
+    if (result == NEOC_SUCCESS) {
+        result = neoc_script_builder_push_data(builder, address->data, sizeof(address->data));
+    }
+    
+    // Call unclaimedGas
+    if (result == NEOC_SUCCESS) {
+        neoc_hash160_t neo_hash;
+        neoc_neo_token_get_script_hash(&neo_hash);
+        result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_UNCLAIMED_GAS, 2);
+    }
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Would invoke script through RPC and parse result
+    *unclaimed = 0;
+    
+    free(script);
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_get_gas_per_block(void *rpc_client,
+                                               uint64_t *gas_per_neo) {
+    if (!rpc_client || !gas_per_neo) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Build invocation script
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t result = neoc_script_builder_create(&builder);
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Call getGasPerBlock
+    neoc_hash160_t neo_hash;
+    neoc_neo_token_get_script_hash(&neo_hash);
+    result = neoc_script_builder_emit_app_call(builder, &neo_hash, NEO_METHOD_GET_GAS_PER_BLOCK, 0);
+    
+    if (result != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return result;
+    }
+    
+    // Get script
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    result = neoc_script_builder_to_array(builder, &script, &script_len);
+    neoc_script_builder_free(builder);
+    
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    
+    // Would invoke script through RPC and parse result
+    *gas_per_neo = 0;
+    
+    free(script);
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_get_account_state(const neoc_hash160_t *address,
+                                               void *rpc_client,
+                                               neoc_neo_account_state_t **state) {
+    if (!address || !rpc_client || !state) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    *state = (neoc_neo_account_state_t*)neoc_malloc(sizeof(neoc_neo_account_state_t));
+    if (!*state) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+    
+    memset(*state, 0, sizeof(neoc_neo_account_state_t));
+    memcpy(&(*state)->address, address, sizeof(neoc_hash160_t));
+    
+    // Would query RPC for actual state
+    // For now, return empty state
+    (*state)->balance = 0;
+    (*state)->balance_height = 0;
+    (*state)->vote_to = NULL;
+    (*state)->last_gas_per_neo = 0;
+    
+    return NEOC_SUCCESS;
+}
+
+void neoc_neo_token_free(neoc_neo_token_t *neo_token) {
+    if (!neo_token) {
+        return;
+    }
+    neoc_free(neo_token);
+}
+
+void neoc_neo_candidate_free(neoc_neo_candidate_t *candidate) {
+    if (!candidate) {
+        return;
+    }
+    if (candidate->public_key) {
+        neoc_ec_public_key_free(candidate->public_key);
+    }
+    neoc_free(candidate);
+}
+
+void neoc_neo_candidates_free(neoc_neo_candidate_t **candidates, size_t count) {
+    if (!candidates) {
+        return;
+    }
+    for (size_t i = 0; i < count; i++) {
+        neoc_neo_candidate_free(candidates[i]);
+    }
+    neoc_free(candidates);
+}
+
+void neoc_neo_account_state_free(neoc_neo_account_state_t *state) {
+    if (!state) {
+        return;
+    }
+    if (state->vote_to) {
+        neoc_ec_public_key_free(state->vote_to);
+    }
+    neoc_free(state);
+}
