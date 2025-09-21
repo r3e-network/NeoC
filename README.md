@@ -1,6 +1,12 @@
 # NeoC SDK
 
-A comprehensive C library for Neo blockchain development providing core functionality for building Neo applications, smart contracts, wallets, and blockchain integrations.
+A comprehensive C library for Neo blockchain development providing core functionality for building Neo applications, smart contracts, wallets, and blockchain integrations. This is a complete C implementation converted from the NeoSwift SDK.
+
+## Repository
+
+- **GitHub**: https://github.com/r3e-network/NeoC
+- **Status**: Production Ready
+- **Version**: 1.0.0
 
 ## Features
 
@@ -8,12 +14,16 @@ A comprehensive C library for Neo blockchain development providing core function
 - **Hash160**: 20-byte hashes for script hashes and addresses
 - **Hash256**: 32-byte hashes for transactions and blocks
 - **Bytes**: Dynamic byte array management with memory safety
+- **ECKeyPair**: Elliptic curve key pair operations
+- **ECDSASignature**: Digital signature operations
 
 ### Cryptographic Operations
 - SHA-256 and double SHA-256 hashing
 - RIPEMD-160 hashing
 - Hash160 computation (SHA-256 + RIPEMD-160)
+- Hash256 computation
 - HMAC-SHA256
+- ECDSA signature generation and verification
 - OpenSSL-based implementation for security and performance
 
 ### Encoding Utilities
@@ -21,6 +31,14 @@ A comprehensive C library for Neo blockchain development providing core function
 - **Base58**: Bitcoin-style Base58 encoding/decoding
 - **Base58Check**: Base58 with checksum validation
 - **Base64**: Standard and URL-safe Base64 encoding/decoding
+
+### Neo Blockchain Features
+- **Wallet Management**: Account creation, WIF import/export, NEP-6 wallet support
+- **Transaction Building**: Complete transaction construction and signing
+- **Smart Contracts**: NEP-17 (fungible tokens), NEP-11 (non-fungible tokens)
+- **Name Service**: Neo Name Service (NNS) integration
+- **RPC Client**: Full Neo node RPC client implementation
+- **Protocol Support**: Neo protocol message handling
 
 ### Memory Management
 - Safe memory allocation with leak detection (debug mode)
@@ -43,8 +61,8 @@ A comprehensive C library for Neo blockchain development providing core function
 brew install cmake openssl cjson curl
 
 # Clone the repository
-git clone https://github.com/yourusername/NeoSwift.git
-cd NeoSwift/NeoC
+git clone https://github.com/r3e-network/NeoC.git
+cd NeoC
 
 # Build the SDK
 mkdir build && cd build
@@ -52,8 +70,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j8
 
 # Run tests
-./tests/test_basic
-./tests/test_comprehensive
+make test
 
 # Install (optional)
 sudo make install
@@ -67,15 +84,14 @@ sudo apt-get update
 sudo apt-get install -y cmake build-essential libssl-dev libcjson-dev libcurl4-openssl-dev
 
 # Clone and build
-git clone https://github.com/yourusername/NeoSwift.git
-cd NeoSwift/NeoC
+git clone https://github.com/r3e-network/NeoC.git
+cd NeoC
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j8
 
 # Run tests
-./tests/test_basic
-./tests/test_comprehensive
+make test
 
 # Install (optional)
 sudo make install
@@ -94,7 +110,8 @@ sudo make install
 
 ```bash
 # Clone and navigate to NeoC directory
-cd NeoSwift/NeoC
+git clone https://github.com/r3e-network/NeoC.git
+cd NeoC
 
 # Create build directory
 mkdir build && cd build
@@ -171,6 +188,60 @@ neoc_hash256_to_hex(&hash, hex_string, sizeof(hex_string), false);
 printf("SHA-256: %s\n", hex_string);
 ```
 
+### Wallet Operations
+
+```c
+// Create new account
+neoc_account_t* account = neoc_account_create();
+if (account) {
+    // Get WIF
+    char wif[64];
+    neoc_account_to_wif(account, wif, sizeof(wif));
+    printf("WIF: %s\n", wif);
+    
+    // Get address
+    char address[64];
+    neoc_account_get_address(account, address, sizeof(address));
+    printf("Address: %s\n", address);
+    
+    neoc_account_free(account);
+}
+```
+
+### Transaction Building
+
+```c
+// Create transaction builder
+neoc_transaction_builder_t* builder = neoc_transaction_builder_create();
+if (builder) {
+    // Add transfer
+    neoc_hash160_t to_address;
+    neoc_hash160_from_address(&to_address, "NQrFVj6NvW5z2wKb3m8X9pL1nR4sT7uY6v");
+    
+    neoc_error_t err = neoc_transaction_builder_add_transfer(
+        builder, 
+        &to_address, 
+        100000000  // 1 NEO (in satoshis)
+    );
+    
+    if (err == NEOC_SUCCESS) {
+        // Build transaction
+        neoc_transaction_t* tx = neoc_transaction_builder_build(builder);
+        if (tx) {
+            // Sign transaction
+            neoc_account_t* account = neoc_account_from_wif("your_wif_here");
+            if (account) {
+                neoc_transaction_sign(tx, account);
+                neoc_account_free(account);
+            }
+            neoc_transaction_free(tx);
+        }
+    }
+    
+    neoc_transaction_builder_free(builder);
+}
+```
+
 ### Encoding Examples
 
 ```c
@@ -195,16 +266,17 @@ neoc_free(base64);
 
 The `examples/` directory contains comprehensive examples:
 
-- `basic_example.c`: Core SDK functionality
-- `encoding_example.c`: Encoding utilities
-- `address_example.c`: Address operations
+- `crypto_example.c`: Cryptographic operations
+- `transaction_example.c`: Transaction building and signing
+- `wallet_example.c`: Wallet management
 
 Build and run examples:
 
 ```bash
 cd build
-./examples/basic_example
-./examples/encoding_example
+./examples/crypto_example
+./examples/transaction_example
+./examples/wallet_example
 ```
 
 ## Testing
@@ -217,6 +289,8 @@ make test
 
 # Or run tests directly
 ./tests/test_basic
+./tests/test_crypto
+./tests/test_wallet
 ```
 
 Debug builds include memory leak detection:
@@ -269,6 +343,40 @@ neoc_error_t neoc_hash256_from_data_double_hash(neoc_hash256_t* hash, const uint
 
 // Conversion
 neoc_error_t neoc_hash256_to_hex(const neoc_hash256_t* hash, char* buffer, size_t buffer_size, bool uppercase);
+```
+
+### Account Operations
+
+```c
+// Account creation
+neoc_account_t* neoc_account_create(void);
+neoc_account_t* neoc_account_from_wif(const char* wif);
+neoc_account_t* neoc_account_from_private_key(const uint8_t* private_key);
+
+// Account operations
+neoc_error_t neoc_account_to_wif(const neoc_account_t* account, char* buffer, size_t buffer_size);
+neoc_error_t neoc_account_get_address(const neoc_account_t* account, char* buffer, size_t buffer_size);
+neoc_error_t neoc_account_get_public_key(const neoc_account_t* account, uint8_t* buffer, size_t buffer_size);
+
+// Memory management
+void neoc_account_free(neoc_account_t* account);
+```
+
+### Transaction Operations
+
+```c
+// Transaction building
+neoc_transaction_builder_t* neoc_transaction_builder_create(void);
+neoc_error_t neoc_transaction_builder_add_transfer(neoc_transaction_builder_t* builder, const neoc_hash160_t* to, uint64_t amount);
+neoc_transaction_t* neoc_transaction_builder_build(neoc_transaction_builder_t* builder);
+
+// Transaction operations
+neoc_error_t neoc_transaction_sign(neoc_transaction_t* transaction, const neoc_account_t* account);
+neoc_error_t neoc_transaction_serialize(const neoc_transaction_t* transaction, uint8_t* buffer, size_t buffer_size, size_t* serialized_size);
+
+// Memory management
+void neoc_transaction_builder_free(neoc_transaction_builder_t* builder);
+void neoc_transaction_free(neoc_transaction_t* transaction);
 ```
 
 ### Encoding Functions
@@ -326,13 +434,40 @@ NeoC is designed to be thread-safe:
 - Error handling uses thread-local storage
 - Crypto functions can be used from multiple threads
 
+## Project Structure
+
+```
+NeoC/
+├── include/neoc/           # Header files
+│   ├── crypto/            # Cryptographic operations
+│   ├── types/             # Core data types
+│   ├── wallet/            # Wallet management
+│   ├── transaction/       # Transaction operations
+│   ├── contract/          # Smart contract support
+│   ├── protocol/          # Neo protocol implementation
+│   └── utils/             # Utility functions
+├── src/                   # Source code implementation
+│   ├── crypto/            # Cryptographic implementations
+│   ├── types/             # Type implementations
+│   ├── wallet/            # Wallet implementations
+│   ├── transaction/       # Transaction implementations
+│   ├── contract/          # Contract implementations
+│   ├── protocol/          # Protocol implementations
+│   └── utils/             # Utility implementations
+├── tests/                 # Test suite
+├── examples/              # Example applications
+├── tools/                 # Build and development tools
+└── CMakeLists.txt         # Build configuration
+```
+
 ## Contributing
 
 1. Follow C11 standards
 2. Include comprehensive tests
 3. Document all public APIs
-4. Use consistent naming conventions
+4. Use consistent naming conventions (`neoc_*` prefix)
 5. Ensure memory safety and leak-free code
+6. Maintain compatibility with the original Swift SDK API
 
 ## License
 
@@ -344,3 +479,13 @@ For issues and questions:
 - Check the examples in `examples/`
 - Review test cases in `tests/`
 - Consult the API documentation in header files
+- Report issues on GitHub: https://github.com/r3e-network/NeoC/issues
+
+## Changelog
+
+### Version 1.0.0
+- Complete C implementation of NeoSwift SDK
+- All core functionality ported and tested
+- Duplicate file cleanup and naming standardization
+- Comprehensive test suite
+- Production-ready build system
