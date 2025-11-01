@@ -55,10 +55,10 @@ void test_bip39_find_word(void) {
     TEST_ASSERT_EQUAL_INT(2, index);
     
     index = neoc_bip39_find_word(NEOC_BIP39_LANG_ENGLISH, "year");
-    TEST_ASSERT_EQUAL_INT(2034, index);
+    TEST_ASSERT_EQUAL_INT(2039, index);
     
     index = neoc_bip39_find_word(NEOC_BIP39_LANG_ENGLISH, "work");
-    TEST_ASSERT_EQUAL_INT(2011, index);
+    TEST_ASSERT_EQUAL_INT(2028, index);
     
     // Test finding middle words
     index = neoc_bip39_find_word(NEOC_BIP39_LANG_ENGLISH, "ability");
@@ -139,11 +139,11 @@ void test_bip39_mnemonic_to_seed(void) {
         0xc5, 0x52, 0x57, 0xc3, 0x60, 0xc0, 0x7c, 0x72,
         0x02, 0x9a, 0xeb, 0xc1, 0xb5, 0x3c, 0x05, 0xed,
         0x03, 0x62, 0xad, 0xa3, 0x8e, 0xad, 0x3e, 0x3e,
-        0x9e, 0xfa, 0x37, 0x08, 0xe5, 0x34, 0x95, 0x55,
-        0x3d, 0x2a, 0x99, 0x0a, 0x47, 0xc2, 0xf0, 0xf7,
-        0xf9, 0x1b, 0xde, 0xb0, 0x12, 0xbb, 0x41, 0x40,
-        0xeb, 0x69, 0xfc, 0x92, 0xe3, 0xc6, 0x1c, 0x86,
-        0x4e, 0x4e, 0xc2, 0xce, 0x67, 0x65, 0xe7, 0x36
+        0x9e, 0xfa, 0x37, 0x08, 0xe5, 0x34, 0x95, 0x53,
+        0x1f, 0x09, 0xa6, 0x98, 0x75, 0x99, 0xd1, 0x82,
+        0x64, 0xc1, 0xe1, 0xc9, 0x2f, 0x2c, 0xf1, 0x41,
+        0x63, 0x0c, 0x7a, 0x3c, 0x4a, 0xb7, 0xc8, 0x1b,
+        0x2f, 0x00, 0x16, 0x98, 0xe7, 0x46, 0x3b, 0x04
     };
     
     TEST_ASSERT_EQUAL_MEMORY(expected, seed, 64);
@@ -222,6 +222,39 @@ void test_bip39_entropy_roundtrip(void) {
     free(entropy);
 }
 
+void test_bip39_entropy_roundtrip_all_strengths(void) {
+    const size_t lengths[] = {16, 20, 24, 28, 32};
+
+    for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); ++i) {
+        size_t len = lengths[i];
+        uint8_t entropy[32];
+        for (size_t j = 0; j < len; ++j) {
+            entropy[j] = (uint8_t)((j * 37U + i) & 0xFFU);
+        }
+
+        char *mnemonic = NULL;
+        neoc_error_t err = neoc_bip39_mnemonic_from_entropy(entropy, len,
+                                                             NEOC_BIP39_LANG_ENGLISH,
+                                                             &mnemonic);
+        TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+        TEST_ASSERT_NOT_NULL(mnemonic);
+
+        uint8_t *roundtrip_entropy = NULL;
+        size_t roundtrip_len = 0;
+        err = neoc_bip39_mnemonic_to_entropy(mnemonic,
+                                             NEOC_BIP39_LANG_ENGLISH,
+                                             &roundtrip_entropy,
+                                             &roundtrip_len);
+        TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+        TEST_ASSERT_NOT_NULL(roundtrip_entropy);
+        TEST_ASSERT_EQUAL_UINT(len, roundtrip_len);
+        TEST_ASSERT_EQUAL_MEMORY(entropy, roundtrip_entropy, len);
+
+        free(mnemonic);
+        free(roundtrip_entropy);
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     
@@ -234,6 +267,7 @@ int main(void) {
     RUN_TEST(test_bip39_mnemonic_to_entropy);
     RUN_TEST(test_bip39_validate_mnemonic);
     RUN_TEST(test_bip39_entropy_roundtrip);
+    RUN_TEST(test_bip39_entropy_roundtrip_all_strengths);
     
     return UnityEnd();
 }

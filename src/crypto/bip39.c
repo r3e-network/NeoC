@@ -6,6 +6,9 @@
 #include "neoc/crypto/bip39.h"
 #include "neoc/crypto/sha256.h"
 #include "neoc/neoc_memory.h"
+#ifdef neoc_bip39_mnemonic_to_seed
+#undef neoc_bip39_mnemonic_to_seed
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include <openssl/rand.h>
@@ -397,92 +400,100 @@ neoc_error_t neoc_bip39_mnemonic_from_entropy(const uint8_t *entropy,
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
     
-    // Validate entropy length (16, 20, 24, 28, or 32 bytes)
     if (entropy_len < 16 || entropy_len > 32 || (entropy_len % 4) != 0) {
         return neoc_error_set(NEOC_ERROR_INVALID_LENGTH, "Invalid entropy length");
     }
     
-    // Get wordlist
     const char* const* wordlist = neoc_bip39_get_wordlist(language);
     if (!wordlist) {
         return neoc_error_set(NEOC_ERROR_NOT_SUPPORTED, "Only English wordlist is currently supported");
     }
     
-    // Calculate checksum
+    size_t checksum_bits = entropy_len / 4;
+    size_t total_bits = entropy_len * 8 + checksum_bits;
+    size_t word_count = total_bits / 11;
+    size_t total_bytes = (total_bits + 7) / 8;
+    
     uint8_t hash[32];
     neoc_error_t err = neoc_sha256(entropy, entropy_len, hash);
     if (err != NEOC_SUCCESS) {
         return err;
     }
-    
-    // Checksum is first (entropy_len / 4) bits of hash
-    size_t checksum_bits = entropy_len / 4;
-    size_t total_bits = entropy_len * 8 + checksum_bits;
-    size_t word_count = total_bits / 11;
-    
-    // Create bit array with entropy + checksum
-    size_t total_bytes = (total_bits + 7) / 8;
-    uint8_t *bits = neoc_calloc(total_bytes, 1);
-    if (!bits) {
-        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate bit array");
+
+    uint8_t *bitstream = neoc_calloc(total_bytes, 1);
+    if (!bitstream) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate bitstream");
     }
-    
-    // Copy entropy
-    memcpy(bits, entropy, entropy_len);
-    
-    // Append checksum bits
-    if (checksum_bits > 0) {
-        uint8_t checksum_byte = hash[0];
-        bits[entropy_len] = checksum_byte;
-    }
-    
-    // Build mnemonic string
-    size_t mnemonic_size = word_count * 20;  // Max word length + space
-    *mnemonic = neoc_calloc(mnemonic_size, 1);
-    if (!*mnemonic) {
-        neoc_free(bits);
-        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate mnemonic");
-    }
-    
-    // Extract 11-bit indices and build mnemonic
-    char *ptr = *mnemonic;
-    for (size_t i = 0; i < word_count; i++) {
-        // Extract 11 bits starting at bit position i * 11
-        size_t bit_pos = i * 11;
-        size_t byte_pos = bit_pos / 8;
-        size_t bit_offset = bit_pos % 8;
-        
-        uint16_t index = 0;
-        if (bit_offset <= 5) {
-            // Can extract from 2 bytes
-            index = (bits[byte_pos] << 8) | bits[byte_pos + 1];
-            index >>= (5 - bit_offset);
-        } else {
-            // Need 3 bytes
-            index = (bits[byte_pos] << 16) | (bits[byte_pos + 1] << 8) | bits[byte_pos + 2];
-            index >>= (13 - bit_offset);
+
+    memcpy(bitstream, entropy, entropy_len);
+
+    size_t bit_position = entropy_len * 8;
+    for (size_t i = 0; i < checksum_bits; ++i, ++bit_position) {
+        size_t hash_bit_index = i;
+        size_t hash_byte = hash_bit_index / 8;
+        int hash_bit_offset = 7 - (int)(hash_bit_index % 8);
+        uint8_t bit = (hash[hash_byte] >> hash_bit_offset) & 0x01U;
+
+        size_t byte_index = bit_position / 8;
+        int bit_offset = 7 - (int)(bit_position % 8);
+        if (bit) {
+            bitstream[byte_index] |= (uint8_t)(1U << bit_offset);
         }
-        index &= 0x7FF;  // Mask to 11 bits
-        
-        // Get word from wordlist
+    }
+
+    size_t mnemonic_chars = word_count - 1; // spaces between words
+    for (size_t i = 0; i < word_count; ++i) {
+        uint16_t index = 0;
+        size_t local_bit = i * 11;
+        for (int j = 0; j < 11; ++j, ++local_bit) {
+            size_t byte_index = local_bit / 8;
+            int bit_offset = 7 - (int)(local_bit % 8);
+            uint8_t bit = (bitstream[byte_index] >> bit_offset) & 0x01U;
+            index = (uint16_t)((index << 1) | bit);
+        }
+
         const char *word = neoc_bip39_get_word(language, index);
         if (!word) {
-            neoc_free(bits);
-            neoc_free(*mnemonic);
-            *mnemonic = NULL;
+            neoc_free(bitstream);
             return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Invalid word index");
         }
-        
-        // Append word
-        if (i > 0) {
-            *ptr++ = ' ';
-        }
-        size_t word_len = strlen(word);
-        memcpy(ptr, word, word_len);
-        ptr += word_len;
+        mnemonic_chars += strlen(word);
     }
-    
-    neoc_free(bits);
+
+    char *output = neoc_calloc(mnemonic_chars + 1, 1);
+    if (!output) {
+        neoc_free(bitstream);
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate mnemonic buffer");
+    }
+
+    size_t out_offset = 0;
+    bit_position = 0;
+    for (size_t i = 0; i < word_count; ++i) {
+        uint16_t index = 0;
+        for (int j = 0; j < 11; ++j, ++bit_position) {
+            size_t byte_index = bit_position / 8;
+            int bit_offset = 7 - (int)(bit_position % 8);
+            uint8_t bit = (bitstream[byte_index] >> bit_offset) & 0x01U;
+            index = (uint16_t)((index << 1) | bit);
+        }
+
+        const char *word = neoc_bip39_get_word(language, index);
+        if (!word) {
+            neoc_free(bitstream);
+            neoc_free(output);
+            return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Invalid word index");
+        }
+
+        size_t word_len = strlen(word);
+        memcpy(output + out_offset, word, word_len);
+        out_offset += word_len;
+        if (i + 1 < word_count) {
+            output[out_offset++] = ' ';
+        }
+    }
+
+    neoc_free(bitstream);
+    *mnemonic = output;
     return NEOC_SUCCESS;
 }
 
@@ -494,148 +505,164 @@ neoc_error_t neoc_bip39_mnemonic_to_entropy(const char *mnemonic,
     if (!mnemonic || !entropy || !entropy_len) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
-    
-    // Count words in mnemonic
+
     char *mnemonic_copy = neoc_strdup(mnemonic);
     if (!mnemonic_copy) {
-        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate memory");
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate mnemonic copy");
     }
-    
-    // Split mnemonic into words
-    char *words[24];  // Maximum 24 words
+
+    char *words[24];
     int word_count = 0;
     char *token = strtok(mnemonic_copy, " ");
-    
     while (token != NULL && word_count < 24) {
         words[word_count++] = token;
         token = strtok(NULL, " ");
     }
-    
-    // Validate word count
-    if (word_count != 12 && word_count != 15 && word_count != 18 && 
-        word_count != 21 && word_count != 24) {
+
+    if (token != NULL ||
+        (word_count != 12 && word_count != 15 && word_count != 18 &&
+         word_count != 21 && word_count != 24)) {
         neoc_free(mnemonic_copy);
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid word count");
     }
-    
-    // Calculate sizes
-    size_t total_bits = word_count * 11;
+
+    size_t total_bits = (size_t)word_count * 11;
     size_t checksum_bits = total_bits / 33;
     size_t entropy_bits = total_bits - checksum_bits;
-    *entropy_len = entropy_bits / 8;
-    
-    // Create bit array for indices
-    size_t total_bytes = (total_bits + 7) / 8;
-    uint8_t *bits = neoc_calloc(total_bytes, 1);
-    if (!bits) {
+
+    if (entropy_bits % 8 != 0) {
         neoc_free(mnemonic_copy);
-        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate bit array");
+        return neoc_error_set(NEOC_ERROR_INTERNAL, "Invalid entropy bit length");
     }
-    
-    // Look up each word and pack indices
-    for (int i = 0; i < word_count; i++) {
+
+    size_t total_bytes = (total_bits + 7) / 8;
+    size_t entropy_bytes = entropy_bits / 8;
+
+    uint8_t *bitstream = neoc_calloc(total_bytes, 1);
+    if (!bitstream) {
+        neoc_free(mnemonic_copy);
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate bitstream");
+    }
+
+    size_t bit_position = 0;
+    for (int i = 0; i < word_count; ++i) {
         int index = neoc_bip39_find_word(language, words[i]);
         if (index < 0) {
+            neoc_free(bitstream);
             neoc_free(mnemonic_copy);
-            neoc_free(bits);
             return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid word in mnemonic");
         }
-        
-        // Pack 11-bit index into bit array
-        size_t bit_pos = i * 11;
-        size_t byte_pos = bit_pos / 8;
-        size_t bit_offset = bit_pos % 8;
-        
-        if (bit_offset <= 5) {
-            // Fits in 2 bytes
-            bits[byte_pos] |= (index >> (3 + bit_offset));
-            bits[byte_pos + 1] |= (index << (5 - bit_offset));
-        } else {
-            // Needs 3 bytes
-            bits[byte_pos] |= (index >> (11 - (8 - bit_offset)));
-            bits[byte_pos + 1] |= (index >> (3 - (8 - bit_offset)));
-            bits[byte_pos + 2] |= (index << (5 + (8 - bit_offset)));
+
+        for (int bit = 10; bit >= 0; --bit, ++bit_position) {
+            if (((uint32_t)index >> bit) & 0x01U) {
+                size_t byte_index = bit_position / 8;
+                int bit_offset = 7 - (int)(bit_position % 8);
+                bitstream[byte_index] |= (uint8_t)(1U << bit_offset);
+            }
         }
     }
-    
-    // Extract entropy
-    *entropy = neoc_malloc(*entropy_len);
-    if (!*entropy) {
+
+    uint8_t *entropy_bytes_ptr = neoc_malloc(entropy_bytes);
+    if (!entropy_bytes_ptr) {
+        neoc_free(bitstream);
         neoc_free(mnemonic_copy);
-        neoc_free(bits);
-        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate entropy");
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate entropy buffer");
     }
-    memcpy(*entropy, bits, *entropy_len);
-    
-    // Extract and verify checksum
+
+    memcpy(entropy_bytes_ptr, bitstream, entropy_bytes);
+
+    uint8_t checksum_accum = 0;
+    for (size_t i = 0; i < checksum_bits; ++i) {
+        size_t pos = entropy_bits + i;
+        size_t byte_index = pos / 8;
+        int bit_offset = 7 - (int)(pos % 8);
+        uint8_t bit = (bitstream[byte_index] >> bit_offset) & 0x01U;
+        checksum_accum = (uint8_t)((checksum_accum << 1) | bit);
+    }
+
     uint8_t hash[32];
-    neoc_error_t err = neoc_sha256(*entropy, *entropy_len, hash);
+    neoc_error_t err = neoc_sha256(entropy_bytes_ptr, entropy_bytes, hash);
     if (err != NEOC_SUCCESS) {
+        neoc_free(entropy_bytes_ptr);
+        neoc_free(bitstream);
         neoc_free(mnemonic_copy);
-        neoc_free(bits);
-        neoc_free(*entropy);
-        *entropy = NULL;
         return err;
     }
-    
-    // Verify checksum
-    uint8_t expected_checksum = hash[0] >> (8 - checksum_bits);
-    uint8_t actual_checksum = bits[*entropy_len] >> (8 - checksum_bits);
-    
+
+    uint8_t expected_checksum = 0;
+    if (checksum_bits > 0) {
+        expected_checksum = (uint8_t)(hash[0] >> (8 - checksum_bits));
+    }
+
+    neoc_free(bitstream);
     neoc_free(mnemonic_copy);
-    neoc_free(bits);
-    
-    if (expected_checksum != actual_checksum) {
-        neoc_free(*entropy);
-        *entropy = NULL;
+
+    if (checksum_accum != expected_checksum) {
+        neoc_free(entropy_bytes_ptr);
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid mnemonic checksum");
     }
-    
+
+    *entropy = entropy_bytes_ptr;
+    *entropy_len = entropy_bytes;
     return NEOC_SUCCESS;
 }
 
 // Generate seed from mnemonic
-neoc_error_t neoc_bip39_mnemonic_to_seed(const char *mnemonic,
-                                          const char *passphrase,
-                                          uint8_t seed[64]) {
-    if (!mnemonic || !seed) {
+static neoc_error_t neoc_bip39_pbkdf2(const char *mnemonic,
+                                      const char *passphrase,
+                                      uint8_t *seed,
+                                      size_t seed_len) {
+    if (!mnemonic || !seed || seed_len == 0) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
-    
-    // Prepare salt: "mnemonic" + passphrase
+
     const char *salt_prefix = "mnemonic";
     size_t salt_len = strlen(salt_prefix);
     size_t pass_len = passphrase ? strlen(passphrase) : 0;
-    
+
     char *salt = neoc_malloc(salt_len + pass_len + 1);
     if (!salt) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate salt");
     }
-    
+
     memcpy(salt, salt_prefix, salt_len);
-    if (passphrase) {
+    if (passphrase && pass_len > 0) {
         memcpy(salt + salt_len, passphrase, pass_len);
     }
     salt[salt_len + pass_len] = '\0';
-    
-    // Use PBKDF2 with HMAC-SHA512, 2048 iterations
-    // BIP-39 specifies UTF-8 NFKD normalization, but for ASCII mnemonics it's not needed
+
     int result = PKCS5_PBKDF2_HMAC(
         mnemonic, (int)strlen(mnemonic),
-        (unsigned char*)salt, (int)(salt_len + pass_len),
-        2048,  // iterations
+        (unsigned char *)salt, (int)(salt_len + pass_len),
+        2048,
         EVP_sha512(),
-        64,    // key length
-        seed
-    );
-    
+        (int)seed_len,
+        seed);
+
     neoc_free(salt);
-    
+
     if (result != 1) {
         return neoc_error_set(NEOC_ERROR_CRYPTO, "PBKDF2 failed");
     }
-    
+
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_bip39_mnemonic_to_seed_buffer(const char *mnemonic,
+                                                const char *passphrase,
+                                                uint8_t seed[64]) {
+    return neoc_bip39_pbkdf2(mnemonic, passphrase, seed, 64);
+}
+
+neoc_error_t neoc_bip39_mnemonic_to_seed_len(const char *mnemonic,
+                                             const char *passphrase,
+                                             uint8_t *seed,
+                                             size_t seed_len) {
+    if (seed_len < 64) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Seed buffer must be at least 64 bytes");
+    }
+
+    return neoc_bip39_pbkdf2(mnemonic, passphrase, seed, seed_len);
 }
 
 // Validate mnemonic

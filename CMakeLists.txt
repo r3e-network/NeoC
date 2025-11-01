@@ -46,12 +46,13 @@ endif()
 
 # cJSON is required for full protocol support
 if(NOT CJSON_FOUND)
-    message(WARNING "cJSON not found - RPC features will be disabled. Install with: brew install cjson")
-    set(CJSON_INCLUDE_DIRS "")
+    message(STATUS "cJSON not found in system - using bundled implementation")
+    set(CJSON_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
     set(CJSON_LIBRARIES "")
-else()
-    message(STATUS "cJSON found: ${CJSON_INCLUDE_DIRS}")
+    set(CJSON_FOUND TRUE)
 endif()
+
+message(STATUS "cJSON include path: ${CJSON_INCLUDE_DIRS}")
 
 # Find libcurl
 find_package(CURL QUIET)
@@ -63,6 +64,8 @@ endif()
 
 # Include directories
 include_directories(include)
+include_directories(third_party)
+include_directories(third_party/cjson)
 include_directories(${OPENSSL_INCLUDE_DIR})
 include_directories(${CJSON_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
@@ -70,9 +73,44 @@ include_directories(${CURL_INCLUDE_DIRS})
 # Source files
 file(GLOB_RECURSE SOURCES "src/*.c")
 list(APPEND SOURCES src/script/script_builder_full.c)
+list(APPEND SOURCES third_party/cjson/cJSON.c)
+
+# Remove incomplete RPC response stubs until they are fully implemented
+list(FILTER SOURCES EXCLUDE REGEX "/src/protocol/core/response/neo_get_.*\\.c$")
+list(FILTER SOURCES EXCLUDE REGEX "/src/protocol/core/response/.*\\.c$")
+list(FILTER SOURCES EXCLUDE REGEX "/src/transaction/neo_transaction\\.c$")
+list(FILTER SOURCES EXCLUDE REGEX "/src/crypto/sha256\\.c$")
+
+set(NEOC_RESPONSE_SOURCES
+    src/protocol/core/response/contract_manifest.c
+    src/protocol/core/response/contract_method_token.c
+    src/protocol/core/response/contract_nef.c
+    src/protocol/core/response/contract_state.c
+    src/protocol/core/response/contract_storage_entry.c
+    src/protocol/core/response/diagnostics.c
+    src/protocol/core/response/express_contract_state.c
+    src/protocol/core/response/express_shutdown.c
+    src/protocol/core/response/invocation_result.c
+    src/protocol/core/response/name_state.c
+    src/protocol/core/response/native_contract_state.c
+    src/protocol/core/response/neo_account_state.c
+    src/protocol/core/response/neo_address.c
+    src/protocol/core/response/neo_application_log.c
+    src/protocol/core/response/neo_block.c
+    src/protocol/core/response/neo_get_claimable.c
+    src/protocol/core/response/neo_find_states.c
+)
+
+foreach(resp ${NEOC_RESPONSE_SOURCES})
+    list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${resp})
+endforeach()
 
 # Create static library
 add_library(neoc STATIC ${SOURCES})
+
+if(CJSON_FOUND)
+    target_compile_definitions(neoc PRIVATE HAVE_CJSON)
+endif()
 
 # Link libraries
 target_link_libraries(neoc 

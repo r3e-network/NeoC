@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifdef HAVE_CJSON
+#include <cjson/cJSON.h>
+#endif
+
 /**
  * @brief Create a new find states result
  */
@@ -134,10 +138,155 @@ neoc_error_t neoc_find_states_response_from_json(
     const char *json_str,
     neoc_find_states_response_t **response
 ) {
-    // TODO: Implement JSON parsing
+#ifndef HAVE_CJSON
     (void)json_str;
     (void)response;
-    return NEOC_ERROR_NOT_IMPLEMENTED;
+    return neoc_error_set(NEOC_ERROR_NOT_SUPPORTED, "findStates parsing requires cJSON");
+#else
+    if (!json_str || !response) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "findStates: invalid arguments to from_json");
+    }
+
+    cJSON *root = cJSON_Parse(json_str);
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) {
+            cJSON_Delete(root);
+        }
+        return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "findStates: root JSON must be object");
+    }
+
+    neoc_find_states_response_t *result_response = NULL;
+    neoc_error_t err = neoc_find_states_response_create(&result_response);
+    if (err != NEOC_SUCCESS) {
+        cJSON_Delete(root);
+        return err;
+    }
+
+    const cJSON *jsonrpc_item = cJSON_GetObjectItemCaseSensitive(root, "jsonrpc");
+    if (jsonrpc_item && cJSON_IsString(jsonrpc_item) && jsonrpc_item->valuestring) {
+        result_response->jsonrpc = neoc_strdup(jsonrpc_item->valuestring);
+        if (!result_response->jsonrpc) {
+            neoc_find_states_response_free(result_response);
+            cJSON_Delete(root);
+            return neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "findStates: failed to duplicate jsonrpc");
+        }
+    }
+
+    const cJSON *id_item = cJSON_GetObjectItemCaseSensitive(root, "id");
+    if (id_item && cJSON_IsNumber(id_item)) {
+        result_response->id = id_item->valueint;
+    }
+
+    const cJSON *error_obj = cJSON_GetObjectItemCaseSensitive(root, "error");
+    if (error_obj && cJSON_IsObject(error_obj)) {
+        const cJSON *code_item = cJSON_GetObjectItemCaseSensitive(error_obj, "code");
+        if (code_item && cJSON_IsNumber(code_item)) {
+            result_response->error_code = code_item->valueint;
+        }
+        const cJSON *message_item = cJSON_GetObjectItemCaseSensitive(error_obj, "message");
+        if (message_item && cJSON_IsString(message_item) && message_item->valuestring) {
+            result_response->error_message = neoc_strdup(message_item->valuestring);
+            if (!result_response->error_message) {
+                neoc_find_states_response_free(result_response);
+                cJSON_Delete(root);
+                return neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "findStates: failed to duplicate error message");
+            }
+        }
+    }
+
+    if (!result_response->error_code) {
+        const cJSON *result_obj = cJSON_GetObjectItemCaseSensitive(root, "result");
+        if (result_obj && cJSON_IsObject(result_obj)) {
+            neoc_find_states_t *states = NULL;
+            err = neoc_find_states_create(&states);
+            if (err != NEOC_SUCCESS) {
+                neoc_find_states_response_free(result_response);
+                cJSON_Delete(root);
+                return err;
+            }
+
+            const cJSON *first_proof_item = cJSON_GetObjectItemCaseSensitive(result_obj, "firstProof");
+            if (first_proof_item && cJSON_IsString(first_proof_item) && first_proof_item->valuestring) {
+                states->first_proof = neoc_strdup(first_proof_item->valuestring);
+                if (!states->first_proof) {
+                    neoc_find_states_free(states);
+                    neoc_find_states_response_free(result_response);
+                    cJSON_Delete(root);
+                    return neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "findStates: failed to duplicate firstProof");
+                }
+            }
+
+            const cJSON *last_proof_item = cJSON_GetObjectItemCaseSensitive(result_obj, "lastProof");
+            if (last_proof_item && cJSON_IsString(last_proof_item) && last_proof_item->valuestring) {
+                states->last_proof = neoc_strdup(last_proof_item->valuestring);
+                if (!states->last_proof) {
+                    neoc_find_states_free(states);
+                    neoc_find_states_response_free(result_response);
+                    cJSON_Delete(root);
+                    return neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "findStates: failed to duplicate lastProof");
+                }
+            }
+
+            const cJSON *truncated_item = cJSON_GetObjectItemCaseSensitive(result_obj, "truncated");
+            if (truncated_item && cJSON_IsBool(truncated_item)) {
+                states->truncated = cJSON_IsTrue(truncated_item);
+            }
+
+            const cJSON *results_array = cJSON_GetObjectItemCaseSensitive(result_obj, "results");
+            if (results_array && cJSON_IsArray(results_array)) {
+                const int count = cJSON_GetArraySize(results_array);
+                for (int i = 0; i < count; ++i) {
+                    cJSON *item = cJSON_GetArrayItem(results_array, i);
+                    if (!item || !cJSON_IsObject(item)) {
+                        continue;
+                    }
+
+                    const cJSON *key_item = cJSON_GetObjectItemCaseSensitive(item, "key");
+                    const cJSON *value_item = cJSON_GetObjectItemCaseSensitive(item, "value");
+
+                    if (!key_item || !cJSON_IsString(key_item) || !key_item->valuestring ||
+                        !value_item || !cJSON_IsString(value_item) || !value_item->valuestring) {
+                        continue;
+                    }
+
+                    neoc_find_states_result_t *result_entry = NULL;
+                    err = neoc_find_states_result_create(&result_entry);
+                    if (err != NEOC_SUCCESS) {
+                        neoc_find_states_free(states);
+                        neoc_find_states_response_free(result_response);
+                        cJSON_Delete(root);
+                        return err;
+                    }
+
+                    result_entry->key = neoc_strdup(key_item->valuestring);
+                    result_entry->value = neoc_strdup(value_item->valuestring);
+                    if (!result_entry->key || !result_entry->value) {
+                        neoc_find_states_result_free(result_entry);
+                        neoc_find_states_free(states);
+                        neoc_find_states_response_free(result_response);
+                        cJSON_Delete(root);
+                        return neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "findStates: failed to duplicate key/value");
+                    }
+
+                    err = neoc_find_states_add_result(states, result_entry);
+                    if (err != NEOC_SUCCESS) {
+                        neoc_find_states_result_free(result_entry);
+                        neoc_find_states_free(states);
+                        neoc_find_states_response_free(result_response);
+                        cJSON_Delete(root);
+                        return err;
+                    }
+                }
+            }
+
+            result_response->result = states;
+        }
+    }
+
+    *response = result_response;
+    cJSON_Delete(root);
+    return NEOC_SUCCESS;
+#endif
 }
 
 /**
