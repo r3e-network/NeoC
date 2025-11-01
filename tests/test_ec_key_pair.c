@@ -234,9 +234,6 @@ void test_public_key_comparison(void) {
 
 int main(void) {
     UNITY_BEGIN();
-    
-    printf("\n=== EC KEY PAIR TESTS ===\n");
-    
     RUN_TEST(test_new_public_key_from_compressed_point);
     RUN_TEST(test_new_public_key_from_uncompressed_point);
     RUN_TEST(test_new_public_key_from_invalid_size);

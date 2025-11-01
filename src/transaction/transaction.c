@@ -4,17 +4,25 @@
 #include "neoc/utils/json.h"
 #include "neoc/utils/neoc_hex.h"
 #include "neoc/neoc_memory.h"
-#include <stdlib.h>
+#include "neoc/serialization/binary_writer.h"
+#include "neoc/serialization/binary_reader.h"
 #include <string.h>
 #include <time.h>
-#include <stdio.h>
+
+static neoc_error_t neoc_tx_attribute_clone_internal(const neoc_tx_attribute_t *source,
+                                                     neoc_tx_attribute_t **dest);
+
+static neoc_error_t neoc_transaction_build_serialized(const neoc_transaction_t *transaction,
+                                                      bool include_witnesses,
+                                                      uint8_t **out_bytes,
+                                                      size_t *out_len);
 
 neoc_error_t neoc_transaction_create(neoc_transaction_t **transaction) {
     if (!transaction) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid transaction pointer");
     }
     
-    *transaction = calloc(1, sizeof(neoc_transaction_t));
+    *transaction = neoc_calloc(1, sizeof(neoc_transaction_t));
     if (!*transaction) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate transaction");
     }
@@ -75,11 +83,11 @@ neoc_error_t neoc_transaction_set_script(neoc_transaction_t *transaction,
     
     // Free old script if exists
     if (transaction->script) {
-        free(transaction->script);
+        neoc_free(transaction->script);
     }
     
     // Allocate and copy new script
-    transaction->script = malloc(script_len);
+    transaction->script = neoc_malloc(script_len);
     if (!transaction->script) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate script");
     }
@@ -88,6 +96,41 @@ neoc_error_t neoc_transaction_set_script(neoc_transaction_t *transaction,
     transaction->script_len = script_len;
     
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_transaction_get_script(const neoc_transaction_t *transaction,
+                                         uint8_t **script,
+                                         size_t *script_len) {
+    if (!transaction || !script || !script_len) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+    }
+
+    if (!transaction->script || transaction->script_len == 0) {
+        *script = NULL;
+        *script_len = 0;
+        return NEOC_SUCCESS;
+    }
+
+    uint8_t *copy = neoc_malloc(transaction->script_len);
+    if (!copy) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to copy transaction script");
+    }
+
+    memcpy(copy, transaction->script, transaction->script_len);
+    *script = copy;
+    *script_len = transaction->script_len;
+    return NEOC_SUCCESS;
+}
+
+const uint8_t* neoc_transaction_get_script_ptr(const neoc_transaction_t *transaction,
+                                               size_t *script_len) {
+    if (!transaction) {
+        return NULL;
+    }
+    if (script_len) {
+        *script_len = transaction->script_len;
+    }
+    return transaction->script;
 }
 
 neoc_error_t neoc_transaction_add_signer(neoc_transaction_t *transaction,
@@ -106,8 +149,8 @@ neoc_error_t neoc_transaction_add_signer(neoc_transaction_t *transaction,
     
     // Resize signers array
     size_t new_count = transaction->signer_count + 1;
-    neoc_signer_t **new_signers = realloc(transaction->signers,
-                                           new_count * sizeof(neoc_signer_t*));
+    neoc_signer_t **new_signers = neoc_realloc(transaction->signers,
+                                               new_count * sizeof(neoc_signer_t*));
     if (!new_signers) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to resize signers");
     }
@@ -127,8 +170,8 @@ neoc_error_t neoc_transaction_add_attribute(neoc_transaction_t *transaction,
     
     // Resize attributes array
     size_t new_count = transaction->attribute_count + 1;
-    neoc_tx_attribute_t **new_attributes = realloc(transaction->attributes,
-                                                    new_count * sizeof(neoc_tx_attribute_t*));
+    neoc_tx_attribute_t **new_attributes = neoc_realloc(transaction->attributes,
+                                                        new_count * sizeof(neoc_tx_attribute_t*));
     if (!new_attributes) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to resize attributes");
     }
@@ -148,8 +191,8 @@ neoc_error_t neoc_transaction_add_witness(neoc_transaction_t *transaction,
     
     // Resize witnesses array
     size_t new_count = transaction->witness_count + 1;
-    neoc_witness_t **new_witnesses = realloc(transaction->witnesses,
-                                              new_count * sizeof(neoc_witness_t*));
+    neoc_witness_t **new_witnesses = neoc_realloc(transaction->witnesses,
+                                                  new_count * sizeof(neoc_witness_t*));
     if (!new_witnesses) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to resize witnesses");
     }
@@ -161,119 +204,164 @@ neoc_error_t neoc_transaction_add_witness(neoc_transaction_t *transaction,
     return NEOC_SUCCESS;
 }
 
+static neoc_error_t neoc_tx_write_signers(const neoc_transaction_t *transaction,
+                                          neoc_binary_writer_t *writer) {
+    neoc_error_t err = neoc_binary_writer_write_var_int(writer, transaction->signer_count);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    for (size_t i = 0; i < transaction->signer_count; ++i) {
+        neoc_signer_t *signer = transaction->signers[i];
+        if (!signer) {
+            return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Transaction signer is NULL");
+        }
+        err = neoc_signer_serialize(signer, writer);
+        if (err != NEOC_SUCCESS) {
+            return err;
+        }
+    }
+
+    return NEOC_SUCCESS;
+}
+
+static neoc_error_t neoc_tx_attribute_write(const neoc_tx_attribute_t *attribute,
+                                            neoc_binary_writer_t *writer) {
+    if (!attribute) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Transaction attribute is NULL");
+    }
+
+    neoc_error_t err = neoc_binary_writer_write_byte(writer, (uint8_t)attribute->type);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    return neoc_binary_writer_write_var_bytes(writer, attribute->data, attribute->data_len);
+}
+
+static neoc_error_t neoc_tx_write_attributes(const neoc_transaction_t *transaction,
+                                             neoc_binary_writer_t *writer) {
+    neoc_error_t err = neoc_binary_writer_write_var_int(writer, transaction->attribute_count);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    for (size_t i = 0; i < transaction->attribute_count; ++i) {
+        err = neoc_tx_attribute_write(transaction->attributes[i], writer);
+        if (err != NEOC_SUCCESS) {
+            return err;
+        }
+    }
+
+    return NEOC_SUCCESS;
+}
+
+static neoc_error_t neoc_tx_write_witnesses(const neoc_transaction_t *transaction,
+                                            neoc_binary_writer_t *writer) {
+    neoc_error_t err = neoc_binary_writer_write_var_int(writer, transaction->witness_count);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    for (size_t i = 0; i < transaction->witness_count; ++i) {
+        uint8_t *witness_bytes = NULL;
+        size_t witness_len = 0;
+        err = neoc_witness_serialize(transaction->witnesses[i], &witness_bytes, &witness_len);
+        if (err != NEOC_SUCCESS) {
+            return err;
+        }
+
+        err = neoc_binary_writer_write_bytes(writer, witness_bytes, witness_len);
+        neoc_free(witness_bytes);
+        if (err != NEOC_SUCCESS) {
+            return err;
+        }
+    }
+
+    return NEOC_SUCCESS;
+}
+
+static size_t neoc_tx_var_int_size(uint64_t value) {
+    if (value < 0xFD) {
+        return 1;
+    } else if (value <= 0xFFFF) {
+        return 3;
+    } else if (value <= 0xFFFFFFFF) {
+        return 5;
+    }
+    return 9;
+}
+
+static neoc_error_t neoc_transaction_build_serialized(const neoc_transaction_t *transaction,
+                                                      bool include_witnesses,
+                                                      uint8_t **out_bytes,
+                                                      size_t *out_len) {
+    if (!transaction || !out_bytes || !out_len) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+    }
+
+    neoc_binary_writer_t *writer = NULL;
+    neoc_error_t err = neoc_binary_writer_create(256, true, &writer);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    err = neoc_binary_writer_write_byte(writer, transaction->version);
+    if (err == NEOC_SUCCESS) {
+        err = neoc_binary_writer_write_uint32(writer, transaction->nonce);
+    }
+    if (err == NEOC_SUCCESS) {
+        err = neoc_binary_writer_write_uint64(writer, transaction->system_fee);
+    }
+    if (err == NEOC_SUCCESS) {
+        err = neoc_binary_writer_write_uint64(writer, transaction->network_fee);
+    }
+    if (err == NEOC_SUCCESS) {
+        err = neoc_binary_writer_write_uint32(writer, transaction->valid_until_block);
+    }
+    if (err == NEOC_SUCCESS) {
+        err = neoc_tx_write_signers(transaction, writer);
+    }
+    if (err == NEOC_SUCCESS) {
+        err = neoc_tx_write_attributes(transaction, writer);
+    }
+    if (err == NEOC_SUCCESS) {
+        err = neoc_binary_writer_write_var_bytes(writer,
+                                                 transaction->script,
+                                                 transaction->script_len);
+    }
+    if (err == NEOC_SUCCESS && include_witnesses) {
+        err = neoc_tx_write_witnesses(transaction, writer);
+    }
+
+    if (err == NEOC_SUCCESS) {
+        err = neoc_binary_writer_to_array(writer, out_bytes, out_len);
+    }
+
+    neoc_binary_writer_free(writer);
+    return err;
+}
+
 neoc_error_t neoc_transaction_calculate_hash(neoc_transaction_t *transaction,
                                               neoc_hash256_t *hash) {
     if (!transaction || !hash) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
     
-    // Serialize transaction without witnesses
     uint8_t *data = NULL;
     size_t data_len = 0;
-    
-    // Calculate size needed
-    data_len = 1 + 4 + 8 + 8 + 4;  // version + nonce + fees + valid_until
-    
-    // Add signers size
-    data_len += 1;  // signer count
-    for (size_t i = 0; i < transaction->signer_count; i++) {
-        data_len += neoc_signer_get_size(transaction->signers[i]);
+
+    neoc_error_t err = neoc_transaction_build_serialized(transaction, false, &data, &data_len);
+    if (err != NEOC_SUCCESS) {
+        return err;
     }
-    
-    // Add attributes size
-    data_len += 1;  // attribute count
-    for (size_t i = 0; i < transaction->attribute_count; i++) {
-        data_len += 1 + transaction->attributes[i]->data_len;
-    }
-    
-    // Add script size
-    data_len += 1 + transaction->script_len;  // varint + script
-    
-    // Allocate buffer
-    data = malloc(data_len);
-    if (!data) {
-        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate serialization buffer");
-    }
-    
-    // Serialize transaction data using NEO protocol format
-    size_t offset = 0;
-    data[offset++] = transaction->version;
-    
-    // Write nonce (little-endian)
-    memcpy(data + offset, &transaction->nonce, 4);
-    offset += 4;
-    
-    // Write fees (little-endian)
-    memcpy(data + offset, &transaction->system_fee, 8);
-    offset += 8;
-    memcpy(data + offset, &transaction->network_fee, 8);
-    offset += 8;
-    
-    // Write valid_until_block (little-endian)
-    memcpy(data + offset, &transaction->valid_until_block, 4);
-    offset += 4;
-    
-    // Write signers count
-    data[offset++] = (uint8_t)transaction->signer_count;
-    
-    // Write signers with full scope data
-    for (size_t i = 0; i < transaction->signer_count; i++) {
-        // Write account script hash (20 bytes)
-        memcpy(data + offset, &transaction->signers[i]->account, 20);
-        offset += 20;
-        // Write witness scope
-        data[offset++] = transaction->signers[i]->scopes;
-        
-        // Write allowed contracts if CustomContracts scope
-        if (transaction->signers[i]->scopes & NEOC_WITNESS_SCOPE_CUSTOM_CONTRACTS) {
-            data[offset++] = (uint8_t)transaction->signers[i]->allowed_contracts_count;
-            for (size_t j = 0; j < transaction->signers[i]->allowed_contracts_count; j++) {
-                memcpy(data + offset, &transaction->signers[i]->allowed_contracts[j], 20);
-                offset += 20;
-            }
-        }
-        
-        // Write allowed groups if CustomGroups scope
-        if (transaction->signers[i]->scopes & NEOC_WITNESS_SCOPE_CUSTOM_GROUPS) {
-            data[offset++] = (uint8_t)transaction->signers[i]->allowed_groups_count;
-            for (size_t j = 0; j < transaction->signers[i]->allowed_groups_count; j++) {
-                size_t group_size = transaction->signers[i]->allowed_groups_sizes[j];
-                data[offset++] = (uint8_t)group_size;
-                memcpy(data + offset, transaction->signers[i]->allowed_groups[j], group_size);
-                offset += group_size;
-            }
-        }
-    }
-    
-    // Write attributes count
-    data[offset++] = (uint8_t)transaction->attribute_count;
-    
-    // Write attributes
-    for (size_t i = 0; i < transaction->attribute_count; i++) {
-        data[offset++] = transaction->attributes[i]->type;
-        if (transaction->attributes[i]->data_len > 0) {
-            memcpy(data + offset, transaction->attributes[i]->data,
-                   transaction->attributes[i]->data_len);
-            offset += transaction->attributes[i]->data_len;
-        }
-    }
-    
-    // Write script
-    data[offset++] = (uint8_t)transaction->script_len;
-    if (transaction->script_len > 0) {
-        memcpy(data + offset, transaction->script, transaction->script_len);
-        offset += transaction->script_len;
-    }
-    
-    // Calculate hash
-    neoc_error_t err = neoc_sha256(data, offset, hash->data);
-    
-    // Store hash in transaction
+
+    err = neoc_sha256(data, data_len, hash->data);
     if (err == NEOC_SUCCESS) {
         memcpy(&transaction->hash, hash, sizeof(neoc_hash256_t));
     }
-    
-    free(data);
+
+    neoc_free(data);
     return err;
 }
 
@@ -300,25 +388,26 @@ neoc_error_t neoc_transaction_serialize(const neoc_transaction_t *transaction,
                                          uint8_t *buffer,
                                          size_t buffer_size,
                                          size_t *serialized_size) {
-    (void)transaction;
-    // Use the NEO transaction serialization implementation
+    if (!transaction || !buffer || !serialized_size) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid serialize arguments");
+    }
+
     uint8_t *data = NULL;
     size_t data_len = 0;
-    
-    neoc_error_t err = neoc_transaction_serialize(transaction, &data, &data_len);
+    neoc_error_t err = neoc_transaction_build_serialized(transaction, true, &data, &data_len);
     if (err != NEOC_SUCCESS) {
         return err;
     }
-    
+
     if (data_len > buffer_size) {
         neoc_free(data);
         return neoc_error_set(NEOC_ERROR_BUFFER_TOO_SMALL, "Buffer too small for serialized transaction");
     }
-    
+
     memcpy(buffer, data, data_len);
     *serialized_size = data_len;
     neoc_free(data);
-    
+
     return NEOC_SUCCESS;
 }
 
@@ -358,13 +447,27 @@ neoc_error_t neoc_transaction_sign(neoc_transaction_t *transaction,
     
     // Get account verification script and public key for witness creation
     // Create witness from account's verification script and signature
+    neoc_ec_key_pair_t *key_pair = neoc_account_get_key_pair_ptr(account);
+    if (!key_pair) {
+        neoc_free(signature);
+        return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Account has no key pair");
+    }
+
+    uint8_t public_key[65];
+    size_t public_key_len = sizeof(public_key);
+    err = neoc_ec_key_pair_get_public_key(key_pair, public_key, &public_key_len);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(signature);
+        return err;
+    }
+
     neoc_witness_t *witness = NULL;
     err = neoc_witness_create_from_signature(signature, signature_len,
-                                              NULL, 0,  // Would need actual public key
-                                              &witness);
-    
-    free(signature);
-    
+                                             public_key, public_key_len,
+                                             &witness);
+
+    neoc_free(signature);
+
     if (err != NEOC_SUCCESS) {
         return err;
     }
@@ -402,25 +505,34 @@ size_t neoc_transaction_get_size(const neoc_transaction_t *transaction) {
     size_t size = 0;
     
     // Fixed fields
-    size += 1 + 4 + 8 + 8 + 4;  // version + nonce + fees + valid_until
+    size += 1;   // version
+    size += 4;   // nonce
+    size += 8;   // system fee
+    size += 8;   // network fee
+    size += 4;   // valid until block
     
     // Signers
-    size += 1;  // count
+    size += neoc_tx_var_int_size(transaction->signer_count);
     for (size_t i = 0; i < transaction->signer_count; i++) {
         size += neoc_signer_get_size(transaction->signers[i]);
     }
     
     // Attributes
-    size += 1;  // count
+    size += neoc_tx_var_int_size(transaction->attribute_count);
     for (size_t i = 0; i < transaction->attribute_count; i++) {
-        size += 1 + transaction->attributes[i]->data_len;
+        size += 1; // attribute type
+        if (transaction->attributes[i]) {
+            size += neoc_tx_var_int_size(transaction->attributes[i]->data_len);
+            size += transaction->attributes[i]->data_len;
+        }
     }
     
     // Script
-    size += 1 + transaction->script_len;
+    size += neoc_tx_var_int_size(transaction->script_len);
+    size += transaction->script_len;
     
     // Witnesses
-    size += 1;  // count
+    size += neoc_tx_var_int_size(transaction->witness_count);
     for (size_t i = 0; i < transaction->witness_count; i++) {
         size += neoc_witness_get_size(transaction->witnesses[i]);
     }
@@ -442,7 +554,7 @@ void neoc_transaction_free(neoc_transaction_t *transaction) {
         for (size_t i = 0; i < transaction->signer_count; i++) {
             neoc_signer_free(transaction->signers[i]);
         }
-        free(transaction->signers);
+        neoc_free(transaction->signers);
     }
     
     // Free attributes
@@ -450,12 +562,12 @@ void neoc_transaction_free(neoc_transaction_t *transaction) {
         for (size_t i = 0; i < transaction->attribute_count; i++) {
             neoc_tx_attribute_free(transaction->attributes[i]);
         }
-        free(transaction->attributes);
+        neoc_free(transaction->attributes);
     }
     
     // Free script
     if (transaction->script) {
-        free(transaction->script);
+        neoc_free(transaction->script);
     }
     
     // Free witnesses
@@ -463,10 +575,10 @@ void neoc_transaction_free(neoc_transaction_t *transaction) {
         for (size_t i = 0; i < transaction->witness_count; i++) {
             neoc_witness_free(transaction->witnesses[i]);
         }
-        free(transaction->witnesses);
+        neoc_free(transaction->witnesses);
     }
     
-    free(transaction);
+    neoc_free(transaction);
 }
 
 neoc_error_t neoc_transaction_clone(const neoc_transaction_t *source,
@@ -489,7 +601,7 @@ neoc_error_t neoc_transaction_clone(const neoc_transaction_t *source,
     copy->hash = source->hash;
 
     if (source->script && source->script_len > 0) {
-        copy->script = malloc(source->script_len);
+        copy->script = neoc_malloc(source->script_len);
         if (!copy->script) {
             neoc_transaction_free(copy);
             return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to clone transaction script");
@@ -499,7 +611,7 @@ neoc_error_t neoc_transaction_clone(const neoc_transaction_t *source,
     }
 
     if (source->signer_count > 0 && source->signers) {
-        copy->signers = calloc(source->signer_count, sizeof(neoc_signer_t *));
+        copy->signers = neoc_calloc(source->signer_count, sizeof(neoc_signer_t *));
         if (!copy->signers) {
             neoc_transaction_free(copy);
             return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate signer clones");
@@ -515,7 +627,7 @@ neoc_error_t neoc_transaction_clone(const neoc_transaction_t *source,
     }
 
     if (source->attribute_count > 0 && source->attributes) {
-        copy->attributes = calloc(source->attribute_count, sizeof(neoc_tx_attribute_t *));
+        copy->attributes = neoc_calloc(source->attribute_count, sizeof(neoc_tx_attribute_t *));
         if (!copy->attributes) {
             neoc_transaction_free(copy);
             return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate attribute clones");
@@ -533,7 +645,7 @@ neoc_error_t neoc_transaction_clone(const neoc_transaction_t *source,
     }
 
     if (source->witness_count > 0 && source->witnesses) {
-        copy->witnesses = calloc(source->witness_count, sizeof(neoc_witness_t *));
+        copy->witnesses = neoc_calloc(source->witness_count, sizeof(neoc_witness_t *));
         if (!copy->witnesses) {
             neoc_transaction_free(copy);
             return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate witness clones");
@@ -565,7 +677,7 @@ neoc_error_t neoc_tx_attribute_create(neoc_tx_attribute_type_t type,
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid attribute pointer");
     }
     
-    *attribute = calloc(1, sizeof(neoc_tx_attribute_t));
+    *attribute = neoc_calloc(1, sizeof(neoc_tx_attribute_t));
     if (!*attribute) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate attribute");
     }
@@ -573,9 +685,9 @@ neoc_error_t neoc_tx_attribute_create(neoc_tx_attribute_type_t type,
     (*attribute)->type = type;
     
     if (data && data_len > 0) {
-        (*attribute)->data = malloc(data_len);
+        (*attribute)->data = neoc_malloc(data_len);
         if (!(*attribute)->data) {
-            free(*attribute);
+            neoc_free(*attribute);
             *attribute = NULL;
             return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate attribute data");
         }
@@ -590,10 +702,10 @@ void neoc_tx_attribute_free(neoc_tx_attribute_t *attribute) {
     if (!attribute) return;
     
     if (attribute->data) {
-        free(attribute->data);
+        neoc_free(attribute->data);
     }
     
-    free(attribute);
+    neoc_free(attribute);
 }
 
 static neoc_error_t neoc_tx_attribute_clone_internal(const neoc_tx_attribute_t *source,
@@ -626,9 +738,16 @@ neoc_transaction_t* neoc_transaction_from_json(const char* json_str) {
     }
     
     // Parse basic fields
-    tx->version = (uint8_t)neoc_json_get_number(json, "version");
-    tx->nonce = (uint32_t)neoc_json_get_number(json, "nonce");
-    tx->valid_until_block = (uint32_t)neoc_json_get_number(json, "validuntilblock");
+    double number_value = 0.0;
+    if (neoc_json_get_number(json, "version", &number_value) == NEOC_SUCCESS) {
+        tx->version = (uint8_t)number_value;
+    }
+    if (neoc_json_get_number(json, "nonce", &number_value) == NEOC_SUCCESS) {
+        tx->nonce = (uint32_t)number_value;
+    }
+    if (neoc_json_get_number(json, "validuntilblock", &number_value) == NEOC_SUCCESS) {
+        tx->valid_until_block = (uint32_t)number_value;
+    }
     
     // Parse fees
     const char* sys_fee_str = neoc_json_get_string(json, "sysfee");
@@ -679,7 +798,7 @@ char* neoc_transaction_to_json(const neoc_transaction_t* tx) {
         script_hex = neoc_malloc(tx->script_len * 2 + 1);
         if (script_hex) {
             size_t hex_len = tx->script_len * 2 + 1;
-            neoc_hex_encode(tx->script, tx->script_len, script_hex, hex_len);
+            neoc_hex_encode(tx->script, tx->script_len, script_hex, hex_len, false, false);
         }
     }
     
