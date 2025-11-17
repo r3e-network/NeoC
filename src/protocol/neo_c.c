@@ -292,11 +292,15 @@ neoc_error_t neoc_neo_c_send_request_async(neoc_neo_c_t *neo_c,
                                           const neoc_byte_array_t *request_data,
                                           neoc_neo_c_callback_t callback,
                                           void *user_data) {
-    (void)neo_c;
-    (void)request_data;
-    (void)callback;
-    (void)user_data;
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Async service send not implemented");
+    if (!neo_c || !request_data || !callback) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT,
+                              "Invalid arguments to send_request_async");
+    }
+
+    neoc_response_t *response = NULL;
+    neoc_error_t err = neoc_neo_c_send_request(neo_c, request_data, &response);
+    callback(response, err, user_data);
+    return err;
 }
 
 /**
