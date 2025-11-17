@@ -164,16 +164,24 @@ void test_ripemd160_repeated_numbers(void) {
 
 void test_ripemd160_million_a(void) {
     // String(repeating: "a", count: 1_000_000)
-    // This test is computationally expensive, so we'll skip it in normal runs
-    TEST_IGNORE_MESSAGE("Million 'a' test is computationally expensive");
-    
-    // If we were to run it:
-    // const char* expected = "52783243c1697bdbe16d37f97f68f08325dc1528";
-    // char* input = malloc(1000001);
-    // memset(input, 'a', 1000000);
-    // input[1000000] = '\0';
-    // ... hash and verify ...
-    // free(input);
+    const char* expected = "52783243c1697bdbe16d37f97f68f08325dc1528";
+    char* input = malloc(1000001);
+    TEST_ASSERT_NOT_NULL(input);
+    memset(input, 'a', 1000000);
+    input[1000000] = '\0';
+
+    uint8_t digest[NEOC_RIPEMD160_DIGEST_LENGTH];
+    neoc_error_t err = neoc_ripemd160((const uint8_t*)input, 1000000, digest);
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+
+    char hex_output[NEOC_RIPEMD160_DIGEST_LENGTH * 2 + 1];
+    for (int i = 0; i < NEOC_RIPEMD160_DIGEST_LENGTH; i++) {
+        sprintf(&hex_output[i * 2], "%02x", digest[i]);
+    }
+    hex_output[NEOC_RIPEMD160_DIGEST_LENGTH * 2] = '\0';
+
+    TEST_ASSERT_EQUAL_STRING(expected, hex_output);
+    free(input);
 }
 
 void test_ripemd160_binary_data(void) {
