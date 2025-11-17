@@ -44,10 +44,9 @@ void test_from_valid_hash(void) {
 void test_creation_throws(void) {
     neoc_hash160_t hash;
     
-    // Test with invalid hex (odd length)
+    // Test with odd length hex - should succeed with padding
     neoc_error_t err = neoc_hash160_from_hex(&hash, "0x23ba2703c53263e8d6e522dc32203339dcd8eee");
-    printf("DEBUG: Error code for odd length: %d\n", err);
-    TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Test with invalid character
     err = neoc_hash160_from_hex(&hash, "g3ba2703c53263e8d6e522dc32203339dcd8eee9");

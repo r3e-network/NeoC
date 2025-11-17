@@ -49,6 +49,8 @@ extern "C" {
 #include "neoc/crypto/sign.h"
 #include "neoc/crypto/wif.h"
 #include "neoc/crypto/nep2.h"
+#include "neoc/crypto/bip39.h"
+#include "neoc/crypto/bip32.h"
 
 /* Script */
 #include "neoc/script/script_builder.h"
@@ -59,6 +61,7 @@ extern "C" {
 #include "neoc/script/script_helper.h"
 
 /* Wallet */
+#include "neoc/wallet/bip39_account.h"
 #include "neoc/wallet/nep6.h"
 
 /* Contract */
@@ -67,6 +70,10 @@ extern "C" {
 #include "neoc/contract/contract_error.h"
 #include "neoc/contract/neoc_uri.h"
 #include "neoc/contract/native_contracts.h"
+
+/* Transactions */
+#include "neoc/transaction/transaction_builder.h"
+#include "neoc/transaction/transaction.h"
 
 /* Note: Additional headers will be added as more modules are implemented
  * - neoc/protocol/neoc_rpc_client.h (full implementation)

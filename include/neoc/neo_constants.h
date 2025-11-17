@@ -25,6 +25,7 @@ extern "C" {
 #define NEOC_HASH160_SIZE 20
 #define NEOC_HASH256_SIZE 32
 #define NEOC_VERIFICATION_SCRIPT_SIZE 40
+#define NEOC_MAX_SCRIPT_SIZE 102400
 
 // Multi-signature limits
 #define NEOC_MAX_PUBLIC_KEYS_PER_MULTISIG_ACCOUNT 1024
@@ -47,13 +48,14 @@ extern "C" {
 #define NEOC_SECONDS_PER_BLOCK 15
 
 // Hash constants
-#define NEOC_HASH160_SIZE 20
-#define NEOC_HASH256_SIZE 32
 #define NEOC_HASH160_STRING_LENGTH (NEOC_HASH160_SIZE * 2 + 1)  // hex string + null terminator
+#define NEOC_HASH256_STRING_LENGTH (NEOC_HASH256_SIZE * 2 + 1)
 #define NEOC_MAX_HEX_STRING_LENGTH 1024
 
 // Address constants
 #define NEOC_ADDRESS_VERSION 0x35
+#define NEOC_ADDRESS_MAX_LENGTH 64
+#define NEOC_WIF_MAX_LENGTH 64
 
 // VM limits
 #define NEOC_MAX_STACK_SIZE 2048
@@ -63,6 +65,8 @@ extern "C" {
 // Native contract hashes (as strings) - defined in respective contract files
 // extern const char* NEOC_NEO_TOKEN_HASH;
 // extern const char* NEOC_GAS_TOKEN_HASH;
+#define NEOC_NEO_TOKEN_HASH_HEX "ef4073a0f2b305a38ec4050e4d3d28bc40ea63f5"
+#define NEOC_GAS_TOKEN_HASH_HEX "d2a4cff31913016155e38e474a2c06d08be276cf"
 extern const char* NEOC_POLICY_CONTRACT_HASH;
 extern const char* NEOC_ROLE_MANAGEMENT_HASH;
 extern const char* NEOC_ORACLE_CONTRACT_HASH;

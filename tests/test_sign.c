@@ -54,8 +54,8 @@ void test_sign_message(void) {
     for (int i = 0; i < 32; i++) printf("%02x", sig_data->s[i]);
     printf("\n");
     
-    // The v value might be different - just check it's valid (27-34)
-    TEST_ASSERT_TRUE(sig_data->v >= 27 && sig_data->v <= 34);
+    // The v value might be different - just check it's valid (27-30)
+    TEST_ASSERT_TRUE(sig_data->v >= 27 && sig_data->v <= 30);
     
     // The signature might be different each time due to random k value
     // Just verify the signature is valid instead of checking exact values
@@ -96,17 +96,45 @@ void test_sign_hex_message(void) {
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(sig_data);
     
-    // Should produce same signature as regular sign
-    TEST_ASSERT_EQUAL_UINT8(27, sig_data->v);
+    // Validate the signature rather than expecting a fixed v
+    TEST_ASSERT_TRUE(sig_data->v >= 27 && sig_data->v <= 30);
+    bool is_valid = neoc_verify_signature((const uint8_t*)test_message,
+                                          strlen(test_message),
+                                          sig_data,
+                                          key_pair->public_key);
+    TEST_ASSERT_TRUE(is_valid);
     
     neoc_signature_data_free(sig_data);
     neoc_ec_key_pair_free(key_pair);
 }
 
 void test_recover_signing_script_hash(void) {
-    // neoc_recover_signing_script_hash is now implemented with basic structure
-    // Note: Full ECDSA recovery requires complex elliptic curve operations
-    TEST_IGNORE_MESSAGE("ECDSA public key recovery not fully implemented - requires additional EC operations");
+    const char* private_key_hex = "9117f4bf9be717c9a90994326897f4243503accd06712162267e77f18b49c3a3";
+    const char* test_message = "A test message";
+    
+    uint8_t private_key[32];
+    size_t decoded_len = 0;
+    neoc_hex_decode(private_key_hex, private_key, sizeof(private_key), &decoded_len);
+    
+    neoc_ec_key_pair_t* key_pair = NULL;
+    neoc_ec_key_pair_create_from_private_key(private_key, &key_pair);
+    
+    neoc_signature_data_t* sig_data = NULL;
+    neoc_sign_message((const uint8_t*)test_message, strlen(test_message), key_pair, &sig_data);
+    
+    neoc_hash160_t recovered;
+    neoc_error_t err = neoc_recover_signing_script_hash((const uint8_t*)test_message,
+                                                        strlen(test_message),
+                                                        sig_data,
+                                                        &recovered);
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    
+    neoc_hash160_t expected;
+    neoc_hash160_from_public_key(&expected, key_pair->public_key->compressed);
+    TEST_ASSERT_TRUE(neoc_hash160_equal(&expected, &recovered));
+    
+    neoc_signature_data_free(sig_data);
+    neoc_ec_key_pair_free(key_pair);
 }
 
 void test_signature_data_from_bytes(void) {
@@ -137,7 +165,7 @@ void test_signature_data_from_bytes(void) {
     neoc_signature_data_free(sig_data);
     
     // Create from bytes
-    err = neoc_signature_data_from_bytes(28, bytes, &sig_data);
+    err = neoc_signature_data_from_bytes_with_v(28, bytes, 64, &sig_data);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_EQUAL_UINT8(28, sig_data->v);
     TEST_ASSERT_EQUAL_MEMORY(r_bytes, sig_data->r, 32);
@@ -148,9 +176,45 @@ void test_signature_data_from_bytes(void) {
 }
 
 void test_public_key_from_signed_message(void) {
-    // Note: neoc_signed_message_to_key requires proper signature recovery implementation
-    // The function is implemented but may not work correctly with all signature types
-    TEST_IGNORE_MESSAGE("Public key recovery needs deterministic signatures");
+    const char* private_key_hex = "9117f4bf9be717c9a90994326897f4243503accd06712162267e77f18b49c3a3";
+    const char* test_message = "A test message";
+    
+    uint8_t private_key[32];
+    size_t decoded_len = 0;
+    neoc_hex_decode(private_key_hex, private_key, sizeof(private_key), &decoded_len);
+    
+    neoc_ec_key_pair_t* key_pair = NULL;
+    neoc_ec_key_pair_create_from_private_key(private_key, &key_pair);
+    
+    neoc_signature_data_t* sig_data = NULL;
+    neoc_sign_message((const uint8_t*)test_message, strlen(test_message), key_pair, &sig_data);
+    
+    neoc_ec_public_key_t* recovered = NULL;
+    neoc_error_t err = neoc_signed_message_to_key((const uint8_t*)test_message,
+                                                  strlen(test_message),
+                                                  sig_data,
+                                                  &recovered);
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    TEST_ASSERT_NOT_NULL(recovered);
+    
+    uint8_t* encoded_expected = NULL;
+    size_t encoded_expected_len = 0;
+    neoc_ec_public_key_get_encoded(key_pair->public_key, true,
+                                   &encoded_expected, &encoded_expected_len);
+    
+    uint8_t* encoded_recovered = NULL;
+    size_t encoded_recovered_len = 0;
+    neoc_ec_public_key_get_encoded(recovered, true,
+                                   &encoded_recovered, &encoded_recovered_len);
+    
+    TEST_ASSERT_EQUAL_INT(encoded_expected_len, encoded_recovered_len);
+    TEST_ASSERT_EQUAL_MEMORY(encoded_expected, encoded_recovered, encoded_expected_len);
+    
+    neoc_free(encoded_expected);
+    neoc_free(encoded_recovered);
+    neoc_ec_public_key_free(recovered);
+    neoc_signature_data_free(sig_data);
+    neoc_ec_key_pair_free(key_pair);
 }
 
 void test_public_key_from_private_key(void) {

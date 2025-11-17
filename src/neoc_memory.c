@@ -171,22 +171,12 @@ void* neoc_realloc(void *ptr, size_t size) {
         return NULL;
     }
     
-    if (custom_allocator.realloc_func) {
-        void *new_ptr = custom_allocator.realloc_func(ptr, size);
-        if (new_ptr) {
-            atomic_fetch_add(&stats.allocation_count, 1);
-            if (!using_custom_allocator()) {
-                atomic_fetch_add(&stats.total_allocated, size);
-                atomic_fetch_add(&stats.current_usage, size);
-            }
-        }
-        return new_ptr;
-    }
-    
     size_t old_size = 0;
     bool had_entry = untrack_allocation(ptr, &old_size);
     
-    void *new_ptr = realloc(ptr, size);
+    void *new_ptr = custom_allocator.realloc_func
+                        ? custom_allocator.realloc_func(ptr, size)
+                        : realloc(ptr, size);
     if (!new_ptr) {
         if (had_entry) {
             track_allocation(ptr, old_size);
@@ -196,13 +186,16 @@ void* neoc_realloc(void *ptr, size_t size) {
     
     track_allocation(new_ptr, size);
     atomic_fetch_add(&stats.allocation_count, 1);
-    atomic_fetch_add(&stats.total_allocated, size);
-    atomic_fetch_add(&stats.current_usage, size);
-    
-    if (had_entry && old_size > 0 && old_size > size) {
-        size_t delta = old_size - size;
-        atomic_fetch_add(&stats.total_freed, delta);
-        atomic_fetch_sub(&stats.current_usage, delta);
+    if (!using_custom_allocator()) {
+        atomic_fetch_add(&stats.total_allocated, size);
+        atomic_fetch_add(&stats.current_usage, size);
+        if (had_entry && old_size > 0) {
+            atomic_fetch_add(&stats.free_count, 1);
+            atomic_fetch_add(&stats.total_freed, old_size);
+            atomic_fetch_sub(&stats.current_usage, old_size);
+        }
+    } else if (had_entry) {
+        atomic_fetch_add(&stats.free_count, 1);
     }
     
     return new_ptr;

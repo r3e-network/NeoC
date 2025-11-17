@@ -41,6 +41,7 @@ typedef struct {
     char *mnemonic;                  /**< Generated BIP-39 mnemonic phrase */
     size_t mnemonic_length;          /**< Length of mnemonic string */
     int word_count;                  /**< Number of words in mnemonic (12, 15, 18, 21, or 24) */
+    char *password;                  /**< Optional password used for seed generation */
     bool is_password_protected;      /**< True if created with password */
 } neoc_bip39_account_t;
 
@@ -204,6 +205,18 @@ neoc_error_t neoc_bip39_account_get_address(const neoc_bip39_account_t *bip39_ac
  */
 neoc_error_t neoc_bip39_account_export_wif(const neoc_bip39_account_t *bip39_account,
                                             char **wif);
+
+/**
+ * @brief Export BIP-39 account to NEP-2 encrypted key
+ *
+ * @param bip39_account The BIP-39 account
+ * @param password Password for encryption
+ * @param nep2_key Output NEP-2 string (caller must free)
+ * @return NEOC_SUCCESS on success, error code otherwise
+ */
+neoc_error_t neoc_bip39_account_export_nep2(const neoc_bip39_account_t *bip39_account,
+                                             const char *password,
+                                             char **nep2_key);
 
 /**
  * @brief Copy a BIP-39 account

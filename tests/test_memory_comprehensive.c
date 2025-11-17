@@ -19,6 +19,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+
+#define TEST_ASSERT_EQUAL_SIZE(expected, actual) \
+    TEST_ASSERT_EQUAL_UINT64((uint64_t)(expected), (uint64_t)(actual))
 
 // Memory tracking globals
 static size_t initial_allocations = 0;
@@ -72,18 +76,18 @@ void test_memory_allocation_tracking(void) {
     // Allocate some memory
     void* ptr1 = neoc_malloc(1024);
     TEST_ASSERT_NOT_NULL(ptr1);
-    TEST_ASSERT_EQUAL_INT(start_count + 1, neoc_get_allocation_count());
+    TEST_ASSERT_EQUAL_SIZE(start_count + 1, neoc_get_allocation_count());
     
     void* ptr2 = neoc_malloc(2048);
     TEST_ASSERT_NOT_NULL(ptr2);
-    TEST_ASSERT_EQUAL_INT(start_count + 2, neoc_get_allocation_count());
+    TEST_ASSERT_EQUAL_SIZE(start_count + 2, neoc_get_allocation_count());
     
     // Free memory
     neoc_free(ptr1);
-    TEST_ASSERT_EQUAL_INT(start_count + 1, neoc_get_allocation_count());
+    TEST_ASSERT_EQUAL_SIZE(start_count + 1, neoc_get_allocation_count());
     
     neoc_free(ptr2);
-    TEST_ASSERT_EQUAL_INT(start_count, neoc_get_allocation_count());
+    TEST_ASSERT_EQUAL_SIZE(start_count, neoc_get_allocation_count());
     
     printf("  Memory tracking working correctly\n");
 #else
@@ -314,13 +318,13 @@ void test_nep2_memory_lifecycle(void) {
         
         // Encrypt with NEP-2
         char* encrypted;
-        err = neoc_nep2_encrypt("password", key_pair, NULL, &encrypted);
+        err = neoc_nep2_encrypt_key_pair(key_pair, "password", NULL, &encrypted);
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
         TEST_ASSERT_NOT_NULL(encrypted);
         
         // Decrypt with NEP-2
         neoc_ec_key_pair_t* decrypted_key_pair;
-        err = neoc_nep2_decrypt("password", encrypted, NULL, &decrypted_key_pair);
+        err = neoc_nep2_decrypt_key_pair(encrypted, "password", NULL, &decrypted_key_pair);
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
         
         // Free memory
@@ -473,12 +477,16 @@ void test_stress_memory_operations(void) {
     
 #ifdef NEOC_DEBUG_MEMORY
     size_t start_allocations = neoc_get_allocation_count();
+    long case_deltas[7] = {0};
 #endif
     
     const int STRESS_ITERATIONS = 1000;
     
     for (int i = 0; i < STRESS_ITERATIONS; i++) {
         // Mix of different operations to stress test memory management
+#ifdef NEOC_DEBUG_MEMORY
+        size_t before = neoc_get_allocation_count();
+#endif
         switch (i % 7) {
             case 0: {
                 // EC key pair operations
@@ -510,8 +518,8 @@ void test_stress_memory_operations(void) {
                 uint8_t bytes[4];
                 size_t len;
                 if (neoc_hex_decode(hex, bytes, sizeof(bytes), &len) == NEOC_SUCCESS) {
-                    char* encoded;
-                    if (neoc_hex_encode(bytes, len, &encoded) == NEOC_SUCCESS) {
+                    char* encoded = neoc_hex_encode_alloc(bytes, len, false, false);
+                    if (encoded) {
                         neoc_free(encoded);
                     }
                 }
@@ -557,7 +565,10 @@ void test_stress_memory_operations(void) {
                 break;
             }
         }
-        
+#ifdef NEOC_DEBUG_MEMORY
+        size_t after = neoc_get_allocation_count();
+        case_deltas[i % 7] += (long)(after - before);
+#endif
         // Update peak every 100 iterations
         if (i % 100 == 0) {
             update_peak_allocations();
@@ -572,6 +583,12 @@ void test_stress_memory_operations(void) {
     printf("  Peak additional allocations: %zu\n", 
            peak_allocations - start_allocations);
     
+    printf("  Allocation delta by case: ");
+    for (int i = 0; i < 7; i++) {
+        printf("[%d]=%ld ", i, case_deltas[i]);
+    }
+    printf("\n");
+
     // Should return to baseline (allowing for small variations)
     size_t diff = (end_allocations > start_allocations) ? 
                   (end_allocations - start_allocations) : 

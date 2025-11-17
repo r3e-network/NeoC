@@ -110,6 +110,10 @@ bool neoc_hex_is_valid_string(const char* str, bool allow_0x_prefix) {
         str += 2;
         len -= 2;
     }
+
+    if (len == 0) {
+        return false;
+    }
     
     // Must have even length for valid hex
     if (len % 2 != 0) {
@@ -207,6 +211,61 @@ neoc_error_t neoc_hex_encode_reverse(const uint8_t *data, size_t data_len, char 
     return err;
 }
 
+char* neoc_hex_encode_alloc(const uint8_t *data, size_t data_length,
+                            bool uppercase, bool include_prefix) {
+    if (!data && data_length > 0) {
+        neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "neoc_hex_encode_alloc: invalid data");
+        return NULL;
+    }
+
+    size_t buffer_size = neoc_hex_encode_buffer_size(data_length, include_prefix);
+    char *buffer = neoc_malloc(buffer_size);
+    if (!buffer) {
+        neoc_error_set(NEOC_ERROR_MEMORY, "neoc_hex_encode_alloc: allocation failed");
+        return NULL;
+    }
+
+    neoc_error_t err = neoc_hex_encode(data, data_length, buffer, buffer_size, uppercase, include_prefix);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(buffer);
+        return NULL;
+    }
+
+    return buffer;
+}
+
+uint8_t* neoc_hex_decode_alloc(const char* hex_string, size_t* decoded_length) {
+    if (!hex_string) {
+        neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "neoc_hex_decode_alloc: hex_string is NULL");
+        return NULL;
+    }
+
+    size_t buffer_size = neoc_hex_decode_buffer_size(hex_string);
+    if (buffer_size == 0) {
+        neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "neoc_hex_decode_alloc: invalid hex string");
+        return NULL;
+    }
+
+    uint8_t *buffer = neoc_malloc(buffer_size);
+    if (!buffer) {
+        neoc_error_set(NEOC_ERROR_MEMORY, "neoc_hex_decode_alloc: allocation failed");
+        return NULL;
+    }
+
+    size_t actual_length = 0;
+    neoc_error_t err = neoc_hex_decode(hex_string, buffer, buffer_size, &actual_length);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(buffer);
+        return NULL;
+    }
+
+    if (decoded_length) {
+        *decoded_length = actual_length;
+    }
+
+    return buffer;
+}
+
 neoc_error_t neoc_hex_decode_reverse(const char *hex, uint8_t **data, size_t *data_len) {
     if (!hex || !data || !data_len) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid parameters");
@@ -241,4 +300,71 @@ neoc_error_t neoc_hex_decode_reverse(const char *hex, uint8_t **data, size_t *da
     }
     
     return NEOC_SUCCESS;
+}
+
+static const char* neoc_hex_skip_prefix(const char *hex_string) {
+    if (hex_string && strlen(hex_string) >= 2 && hex_string[0] == '0' &&
+        (hex_string[1] == 'x' || hex_string[1] == 'X')) {
+        return hex_string + 2;
+    }
+    return hex_string;
+}
+
+neoc_error_t neoc_hex_normalize(const char* hex_string,
+                               char* buffer, size_t buffer_size,
+                               bool uppercase) {
+    if (!hex_string || !buffer) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "neoc_hex_normalize: invalid arguments");
+    }
+
+    const char *trimmed = neoc_hex_skip_prefix(hex_string);
+    size_t len = strlen(trimmed);
+    if (len % 2 != 0) {
+        return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "neoc_hex_normalize: hex must have even length");
+    }
+    if (buffer_size < len + 1) {
+        return neoc_error_set(NEOC_ERROR_BUFFER_TOO_SMALL, "neoc_hex_normalize: buffer too small");
+    }
+
+    for (size_t i = 0; i < len; ++i) {
+        char c = trimmed[i];
+        if (!neoc_hex_is_valid_char(c)) {
+            return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "neoc_hex_normalize: invalid character");
+        }
+        buffer[i] = uppercase ? (char)toupper((unsigned char)c) : (char)tolower((unsigned char)c);
+    }
+    buffer[len] = '\0';
+    return NEOC_SUCCESS;
+}
+
+int neoc_hex_compare(const char* hex1, const char* hex2) {
+    if (hex1 == hex2) {
+        return 0;
+    }
+    const char *a = neoc_hex_skip_prefix(hex1);
+    const char *b = neoc_hex_skip_prefix(hex2);
+    size_t len_a = strlen(a);
+    size_t len_b = strlen(b);
+
+    if (len_a % 2 != 0 || len_b % 2 != 0) {
+        return (int)(len_a - len_b);
+    }
+
+    size_t min_len = len_a < len_b ? len_a : len_b;
+    for (size_t i = 0; i < min_len; ++i) {
+        char ca = (char)tolower((unsigned char)a[i]);
+        char cb = (char)tolower((unsigned char)b[i]);
+        if (ca != cb) {
+            return (int)(unsigned char)ca - (int)(unsigned char)cb;
+        }
+    }
+
+    if (len_a == len_b) {
+        return 0;
+    }
+    return (len_a < len_b) ? -1 : 1;
+}
+
+bool neoc_hex_equal(const char* hex1, const char* hex2) {
+    return neoc_hex_compare(hex1, hex2) == 0;
 }
