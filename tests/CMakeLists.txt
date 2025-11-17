@@ -186,23 +186,12 @@ add_executable(test_neo_c_client test_neo_c_client.c)
 target_link_libraries(test_neo_c_client unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
 
 find_package(CURL REQUIRED)
-find_library(CJSON_LIBRARY cjson)
-if(NOT CJSON_LIBRARY)
-    find_library(CJSON_LIBRARY cJSON)
-endif()
 
-if(CJSON_LIBRARY)
-    add_executable(test_integration test_integration.c)
-    target_link_libraries(test_integration unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto ${CURL_LIBRARIES} ${CJSON_LIBRARY})
-else()
-    message(WARNING "cJSON library not found - skipping test_integration target")
-endif()
+add_executable(test_integration test_integration.c)
+target_link_libraries(test_integration unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto ${CURL_LIBRARIES})
 
 add_executable(test_find_states_response test_find_states_response.c)
 target_link_libraries(test_find_states_response unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
-if(CJSON_LIBRARY)
-    target_link_libraries(test_find_states_response ${CJSON_LIBRARY})
-endif()
 
 # ===== COMPREHENSIVE TEST MODULES (Converted from Swift and Extended) =====
 
@@ -498,17 +487,13 @@ set_tests_properties(MathUtilTests PROPERTIES
 )
 
 # BIP-39 test vectors
-if(CJSON_LIBRARY)
-    add_executable(test_bip39_vectors test_bip39_vectors.c)
-    target_link_libraries(test_bip39_vectors unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto ${CURL_LIBRARIES} ${CJSON_LIBRARY})
-    add_test(NAME BIP39VectorTests COMMAND test_bip39_vectors)
-    set_tests_properties(BIP39VectorTests PROPERTIES 
-        TIMEOUT 60
-        LABELS "crypto;bip39;vectors"
-    )
-else()
-    message(WARNING "cJSON library not found - skipping BIP39 vector tests")
-endif()
+add_executable(test_bip39_vectors test_bip39_vectors.c)
+target_link_libraries(test_bip39_vectors unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto ${CURL_LIBRARIES})
+add_test(NAME BIP39VectorTests COMMAND test_bip39_vectors)
+set_tests_properties(BIP39VectorTests PROPERTIES 
+    TIMEOUT 60
+    LABELS "crypto;bip39;vectors"
+)
 
 # Multi-signature tests (disabled temporarily)
 # add_executable(test_multi_sig test_multi_sig.c)
@@ -519,14 +504,12 @@ endif()
 #     LABELS "wallet;multisig;unit"
 # )
 
-if(CJSON_LIBRARY)
-    # Integration tests
-    add_test(NAME IntegrationTests COMMAND test_integration)
-    set_tests_properties(IntegrationTests PROPERTIES 
-        TIMEOUT 120
-        LABELS "integration;e2e"
-    )
-endif()
+# Integration tests
+add_test(NAME IntegrationTests COMMAND test_integration)
+set_tests_properties(IntegrationTests PROPERTIES 
+    TIMEOUT 120
+    LABELS "integration;e2e"
+)
 
 # ===== COMPREHENSIVE TEST CASES =====
 
