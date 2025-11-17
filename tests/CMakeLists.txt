@@ -247,8 +247,6 @@ target_link_libraries(test_performance_comprehensive unity ${NEOC_LIBS} OpenSSL:
 # target_link_libraries(test_thread_safety ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
 
 # Test runner configuration
-enable_testing()
-
 # Basic functionality tests
 add_test(NAME BasicTests COMMAND test_basic)
 set_tests_properties(BasicTests PROPERTIES 
