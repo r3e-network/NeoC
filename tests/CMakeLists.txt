@@ -182,6 +182,9 @@ target_link_libraries(test_data_validation unity ${NEOC_LIBS} OpenSSL::SSL OpenS
 add_executable(test_neo_c_express test_neo_c_express.c)
 target_link_libraries(test_neo_c_express unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
 
+add_executable(test_neo_c_client test_neo_c_client.c)
+target_link_libraries(test_neo_c_client unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
 find_package(CURL REQUIRED)
 find_library(CJSON_LIBRARY cjson)
 if(NOT CJSON_LIBRARY)
@@ -474,6 +477,12 @@ add_test(NAME NeoCExpressTests COMMAND test_neo_c_express)
 set_tests_properties(NeoCExpressTests PROPERTIES
     TIMEOUT 60
     LABELS "protocol;express;unit"
+)
+
+add_test(NAME NeoCClientSendRequestTests COMMAND test_neo_c_client)
+set_tests_properties(NeoCClientSendRequestTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;client;unit"
 )
 
 # Type Conversion tests

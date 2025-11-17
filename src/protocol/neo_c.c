@@ -13,6 +13,8 @@
 #include "neoc/protocol/rx/json_rpc2_0_rx.h"
 #include "neoc/neoc_memory.h"
 #include "neoc/neoc_error.h"
+#include "neoc/utils/decode.h"
+#include <cjson/cJSON.h>
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -165,12 +167,122 @@ neoc_error_t neoc_neo_c_get_network_magic_number_bytes(neoc_neo_c_t *neo_c, uint
 neoc_error_t neoc_neo_c_send_request(neoc_neo_c_t *neo_c,
                                     const neoc_byte_array_t *request_data,
                                     neoc_response_t **response_out) {
-    (void)neo_c;
-    (void)request_data;
-    if (response_out) {
-        *response_out = NULL;
+    if (!neo_c || !request_data || !response_out) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT,
+                              "Invalid arguments to send_request");
     }
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Service send not implemented");
+
+    *response_out = NULL;
+
+    neoc_service_t *service = neoc_neo_c_get_service(neo_c);
+    if (!service) {
+        return neoc_error_set(NEOC_ERROR_INVALID_STATE,
+                              "NeoC client missing base service");
+    }
+
+    neoc_byte_array_t *result = NULL;
+    neoc_error_t err = neoc_service_perform_io(service, request_data, &result);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    if (!result || !result->data) {
+        neoc_byte_array_free(result);
+        return neoc_error_set(NEOC_ERROR_INVALID_FORMAT,
+                              "Service returned empty response");
+    }
+
+    char *response_str = neoc_malloc(result->length + 1);
+    if (!response_str) {
+        neoc_byte_array_free(result);
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate response buffer");
+    }
+    memcpy(response_str, result->data, result->length);
+    response_str[result->length] = '\0';
+
+    cJSON *response_json = cJSON_Parse(response_str);
+    if (!response_json || !cJSON_IsObject(response_json)) {
+        cJSON_Delete(response_json);
+        neoc_byte_array_free(result);
+        neoc_free(response_str);
+        return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Failed to parse response JSON");
+    }
+
+    neoc_response_t *resp = neoc_response_create(0);
+    if (!resp) {
+        cJSON_Delete(response_json);
+        neoc_byte_array_free(result);
+        neoc_free(response_str);
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate response");
+    }
+
+    const cJSON *jsonrpc = cJSON_GetObjectItemCaseSensitive(response_json, "jsonrpc");
+    if (cJSON_IsString(jsonrpc) && jsonrpc->valuestring) {
+        neoc_free(resp->jsonrpc);
+        resp->jsonrpc = neoc_strdup(jsonrpc->valuestring);
+    }
+
+    const cJSON *id = cJSON_GetObjectItemCaseSensitive(response_json, "id");
+    if (id) {
+        if (cJSON_IsNumber(id)) {
+            resp->id = (int)id->valuedouble;
+        } else if (cJSON_IsString(id) && id->valuestring) {
+            int parsed_id = 0;
+            if (neoc_decode_int_from_string(id->valuestring, &parsed_id) == NEOC_SUCCESS) {
+                resp->id = parsed_id;
+            }
+        }
+    }
+
+    if (service->config.include_raw_responses) {
+        neoc_response_set_raw(resp, response_str);
+    }
+
+    const cJSON *error_obj = cJSON_GetObjectItemCaseSensitive(response_json, "error");
+    if (error_obj && cJSON_IsObject(error_obj)) {
+        const cJSON *code = cJSON_GetObjectItemCaseSensitive(error_obj, "code");
+        const cJSON *message = cJSON_GetObjectItemCaseSensitive(error_obj, "message");
+        const cJSON *data = cJSON_GetObjectItemCaseSensitive(error_obj, "data");
+
+        char *data_str = NULL;
+        if (data) {
+            if (cJSON_IsString(data) && data->valuestring) {
+                data_str = data->valuestring;
+            } else {
+                data_str = cJSON_PrintUnformatted((cJSON *)data);
+            }
+        }
+
+        neoc_response_set_error(resp,
+                                 code && cJSON_IsNumber(code) ? (int)code->valuedouble : -1,
+                                 message && cJSON_IsString(message) ? message->valuestring : NULL,
+                                 data_str);
+
+        if (data && data_str && data_str != data->valuestring) {
+            cJSON_free(data_str);
+        }
+    } else {
+        const cJSON *result_obj = cJSON_GetObjectItemCaseSensitive(response_json, "result");
+        if (result_obj) {
+            char *result_str = cJSON_PrintUnformatted((cJSON *)result_obj);
+            if (!result_str) {
+                neoc_response_free(resp);
+                cJSON_Delete(response_json);
+                neoc_byte_array_free(result);
+                neoc_free(response_str);
+                return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to serialize result");
+            }
+            resp->result = result_str;
+            resp->has_error = false;
+        }
+    }
+
+    *response_out = resp;
+
+    cJSON_Delete(response_json);
+    neoc_byte_array_free(result);
+    neoc_free(response_str);
+    return NEOC_SUCCESS;
 }
 
 /**
