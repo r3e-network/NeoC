@@ -5,6 +5,7 @@ cmake_install.cmake
 install_manifest.txt
 Testing/
 NeoSwift/
+examples/Makefile
 *.o
 *.a
 *.so
