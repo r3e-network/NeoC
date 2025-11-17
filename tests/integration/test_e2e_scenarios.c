@@ -186,8 +186,12 @@ static integration_test_result_t test_token_transfer_scenario(void *context) {
     INTEGRATION_ASSERT_SUCCESS(err);
     
     // Step 3: Create GAS token contract
-    neoc_smart_contract_t *gas_token = NULL;
+    neoc_gas_token_t *gas_token = NULL;
     err = neoc_gas_token_create(&gas_token);
+    INTEGRATION_ASSERT_SUCCESS(err);
+    
+    neoc_hash160_t gas_hash;
+    err = neoc_gas_token_get_script_hash(gas_token, &gas_hash);
     INTEGRATION_ASSERT_SUCCESS(err);
     
     if (ctx->verbose) {
@@ -261,7 +265,7 @@ static integration_test_result_t test_token_transfer_scenario(void *context) {
     // Add GAS transfer
     err = neoc_transaction_builder_invoke_contract(
         builder,
-        neoc_smart_contract_get_script_hash(gas_token),
+        &gas_hash,
         "transfer",
         gas_params,
         4
@@ -347,7 +351,7 @@ static integration_test_result_t test_token_transfer_scenario(void *context) {
         neoc_contract_parameter_free(gas_params[i]);
     }
     neoc_smart_contract_free(neo_token);
-    neoc_smart_contract_free(gas_token);
+    neoc_gas_token_free(gas_token);
     neoc_account_free(sender);
     neoc_account_free(receiver);
     

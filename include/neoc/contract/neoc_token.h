@@ -11,16 +11,25 @@
 #include <stddef.h>
 #include "neoc/neoc_error.h"
 #include "neoc/contract/fungible_token.h"
-#include "neoc/crypto/e_c_point.h"
+#include "neoc/crypto/ecpoint.h"
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/types/neoc_types_alt.h"
+#include "neoc/wallet/account.h"
 
+#ifndef NEOC_PP_OVERLOAD
+#define NEOC_PP_CONCAT(a,b) NEOC_PP_CONCAT_IMPL(a,b)
+#define NEOC_PP_CONCAT_IMPL(a,b) a##b
+#define NEOC_PP_NARGS_IMPL(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,N,...) N
+#define NEOC_PP_NARGS(...) NEOC_PP_NARGS_IMPL(__VA_ARGS__,10,9,8,7,6,5,4,3,2,1,0)
+#define NEOC_PP_OVERLOAD(prefix, ...) NEOC_PP_CONCAT(prefix, NEOC_PP_NARGS(__VA_ARGS__))(__VA_ARGS__)
+#endif
 
 // NEO Token Constants
 #define NEO_TOKEN_ID 0x01
 #define NEO_TOKEN_SYMBOL "NEO"
 #define NEO_TOKEN_DECIMALS 0
 #define NEO_TOKEN_TOTAL_SUPPLY 100000000
+#define NEO_TOKEN_NAME "NeoToken"
 
 #ifdef __cplusplus
 extern "C" {
@@ -134,12 +143,23 @@ void neoc_neo_token_free(neoc_neo_token_t *token);
  */
 void neoc_candidate_info_free(neoc_candidate_info_t *info);
 
+neoc_error_t neoc_neo_token_get_name(neoc_neo_token_t *token, char **name);
+neoc_error_t neoc_neo_token_get_symbol_copy(neoc_neo_token_t *token, char **symbol);
+const char *neoc_neo_token_get_symbol_const(void);
+uint8_t neoc_neo_token_get_decimals(void);
+neoc_error_t neoc_neo_token_get_total_supply(neoc_neo_token_t *token, int64_t *total_supply);
+neoc_error_t neoc_neo_token_get_balance(neoc_neo_token_t *token,
+                                        const neoc_account_t *account,
+                                        int64_t *balance);
 
-// NEO Token Constants
-#define NEO_TOKEN_ID 0x01
-#define NEO_TOKEN_SYMBOL "NEO"
-#define NEO_TOKEN_DECIMALS 0
-#define NEO_TOKEN_TOTAL_SUPPLY 100000000
+#define NEOC_NEO_TOKEN_GET_SYMBOL_0() \
+    neoc_neo_token_get_symbol_const()
+
+#define NEOC_NEO_TOKEN_GET_SYMBOL_2(token, out_symbol) \
+    neoc_neo_token_get_symbol_copy((token), (out_symbol))
+
+#define neoc_neo_token_get_symbol(...) \
+    NEOC_PP_OVERLOAD(NEOC_NEO_TOKEN_GET_SYMBOL_, __VA_ARGS__)
 
 #ifdef __cplusplus
 }

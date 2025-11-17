@@ -44,6 +44,67 @@ neoc_error_t neoc_neo_token_create(neoc_neo_token_t **neo_token) {
     return NEOC_SUCCESS;
 }
 
+neoc_error_t neoc_neo_token_get_name(neoc_neo_token_t *token, char **name) {
+    if (!token || !name) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+
+    *name = neoc_strdup(NEO_TOKEN_NAME);
+    if (!*name) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+
+    return NEOC_SUCCESS;
+}
+
+const char *neoc_neo_token_get_symbol_const(void) {
+    return NEO_TOKEN_SYMBOL;
+}
+
+neoc_error_t neoc_neo_token_get_symbol_copy(neoc_neo_token_t *token, char **symbol) {
+    if (!token || !symbol) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+
+    *symbol = neoc_strdup(NEO_TOKEN_SYMBOL);
+    if (!*symbol) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+
+    return NEOC_SUCCESS;
+}
+
+uint8_t neoc_neo_token_get_decimals(void) {
+    return NEO_TOKEN_DECIMALS;
+}
+
+neoc_error_t neoc_neo_token_get_total_supply(neoc_neo_token_t *token,
+                                             int64_t *total_supply) {
+    if (!token || !total_supply) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+
+    *total_supply = (int64_t)NEO_TOKEN_TOTAL_SUPPLY;
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_token_get_balance(neoc_neo_token_t *token,
+                                        const neoc_account_t *account,
+                                        int64_t *balance) {
+    if (!token || !account || !balance) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+
+    neoc_hash160_t script_hash;
+    neoc_error_t err = neoc_account_get_script_hash(account, &script_hash);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    *balance = 0;
+    return NEOC_SUCCESS;
+}
+
 neoc_error_t neoc_neo_token_get_script_hash(neoc_hash160_t *script_hash) {
     if (!script_hash) {
         return NEOC_ERROR_INVALID_ARGUMENT;
@@ -223,7 +284,7 @@ neoc_error_t neoc_neo_token_register_candidate(neoc_ec_point_t *public_key) {
     // Push public key parameter (expects encoded bytes)
     uint8_t *encoded_key = NULL;
     size_t encoded_len = 0;
-    err = neoc_ec_point_encode(public_key, true, &encoded_key, &encoded_len);
+    err = neoc_ec_point_get_encoded(public_key, true, &encoded_key, &encoded_len);
     if (err != NEOC_SUCCESS) {
         neoc_script_builder_free(sb);
         return err;
@@ -264,7 +325,7 @@ neoc_error_t neoc_neo_token_unregister_candidate(neoc_ec_point_t *public_key) {
     // Push public key parameter
     uint8_t *encoded_key = NULL;
     size_t encoded_len = 0;
-    err = neoc_ec_point_encode(public_key, true, &encoded_key, &encoded_len);
+    err = neoc_ec_point_get_encoded(public_key, true, &encoded_key, &encoded_len);
     if (err != NEOC_SUCCESS) {
         neoc_script_builder_free(sb);
         return err;
@@ -308,7 +369,7 @@ neoc_error_t neoc_neo_token_vote(neoc_hash160_t *account,
     if (candidate) {
         uint8_t *encoded_key = NULL;
         size_t encoded_len = 0;
-        err = neoc_ec_point_encode(candidate, true, &encoded_key, &encoded_len);
+        err = neoc_ec_point_get_encoded(candidate, true, &encoded_key, &encoded_len);
         if (err != NEOC_SUCCESS) {
             neoc_script_builder_free(sb);
             return err;

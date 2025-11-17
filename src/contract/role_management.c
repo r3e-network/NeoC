@@ -120,7 +120,7 @@ neoc_error_t neoc_role_management_designate_as_role(neoc_role_management_t *role
     for (size_t i = 0; i < count; i++) {
         uint8_t *point_bytes_ptr;
         size_t point_len;
-        err = neoc_ec_point_encode(nodes[i], true, &point_bytes_ptr, &point_len);
+        err = neoc_ec_point_get_encoded(nodes[i], true, &point_bytes_ptr, &point_len);
         if (err != NEOC_SUCCESS) {
             neoc_script_builder_free(builder);
             return err;

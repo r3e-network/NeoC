@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "neoc/neoc_error.h"
-#include "neoc/crypto/e_c_point.h"
+#include "neoc/crypto/ecpoint.h"
 
 #ifdef __cplusplus
 extern "C" {

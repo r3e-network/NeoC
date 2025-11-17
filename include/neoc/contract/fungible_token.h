@@ -23,7 +23,7 @@ extern "C" {
 typedef struct neoc_fungible_token {
     neoc_token_t base;                  // Base token
     uint8_t decimals;                   // Token decimals
-    int64_t total_supply;               // Total supply
+    uint64_t total_supply;              // Total supply (fractions)
 } neoc_fungible_token_t;
 
 /**
@@ -75,7 +75,7 @@ uint8_t neoc_fungible_token_get_decimals(neoc_fungible_token_t *token);
  * @param token The token
  * @return Total supply
  */
-int64_t neoc_fungible_token_get_total_supply(neoc_fungible_token_t *token);
+uint64_t neoc_fungible_token_get_total_supply(neoc_fungible_token_t *token);
 
 /**
  * Free fungible token

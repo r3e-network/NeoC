@@ -147,7 +147,7 @@ void test_gas_token_balance_of(void) {
     // Balance query might fail in test environment, but function should handle gracefully
     if (err == NEOC_SUCCESS) {
         printf("  Balance for test address: %llu GAS\n", (unsigned long long)balance);
-        TEST_ASSERT_TRUE(balance >= 0);  // Balance should be non-negative
+        TEST_ASSERT_TRUE(balance < UINT64_MAX);  // Sanity check: balance within expected range
     } else {
         printf("  Balance query failed (expected in test environment): %d\n", err);
     }
@@ -182,7 +182,7 @@ void test_gas_token_transfer_script(void) {
     
     uint8_t* script;
     size_t script_len;
-    err = neoc_gas_token_build_transfer_script(gas_token, &from_address, &to_address, amount, NULL, &script, &script_len);
+    err = neoc_gas_token_build_transfer_script(gas_token, &from_address, &to_address, amount, NULL, 0, &script, &script_len);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(script);
     TEST_ASSERT_TRUE(script_len > 0);
@@ -201,7 +201,7 @@ void test_gas_token_multi_transfer_script(void) {
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Create multiple transfer recipients
-    neoc_token_transfer_t transfers[3];
+    neoc_gas_token_transfer_request_t transfers[3];
     
     // Transfer 1: 1 GAS
     const char* to1_hex = "05859de95ccbbd5668e0f055b208273634d4657f";
@@ -298,23 +298,23 @@ void test_gas_token_transfer_invalid_inputs(void) {
     size_t script_len;
     
     // Test null from address
-    err = neoc_gas_token_build_transfer_script(gas_token, NULL, &test_address, 1000000, NULL, &script, &script_len);
+    err = neoc_gas_token_build_transfer_script(gas_token, NULL, &test_address, 1000000, NULL, 0, &script, &script_len);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     
     // Test null to address
-    err = neoc_gas_token_build_transfer_script(gas_token, &test_address, NULL, 1000000, NULL, &script, &script_len);
+    err = neoc_gas_token_build_transfer_script(gas_token, &test_address, NULL, 1000000, NULL, 0, &script, &script_len);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     
     // Test zero amount
-    err = neoc_gas_token_build_transfer_script(gas_token, &test_address, &test_address, 0, NULL, &script, &script_len);
+    err = neoc_gas_token_build_transfer_script(gas_token, &test_address, &test_address, 0, NULL, 0, &script, &script_len);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     
     // Test null output script
-    err = neoc_gas_token_build_transfer_script(gas_token, &test_address, &test_address, 1000000, NULL, NULL, &script_len);
+    err = neoc_gas_token_build_transfer_script(gas_token, &test_address, &test_address, 1000000, NULL, 0, NULL, &script_len);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     
     // Test null output script_len
-    err = neoc_gas_token_build_transfer_script(gas_token, &test_address, &test_address, 1000000, NULL, &script, NULL);
+    err = neoc_gas_token_build_transfer_script(gas_token, &test_address, &test_address, 1000000, NULL, 0, &script, NULL);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     
     neoc_gas_token_free(gas_token);
