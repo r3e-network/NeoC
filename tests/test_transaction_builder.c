@@ -1,4 +1,5 @@
 #include <unity.h>
+#include <neoc/neoc.h>
 #include <neoc/transaction/transaction_builder.h>
 #include <neoc/wallet/account.h>
 #include <neoc/types/neoc_hash160.h>
@@ -6,11 +7,12 @@
 #include <string.h>
 
 void setUp(void) {
-    // Setup code
+    neoc_error_t err = neoc_init();
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
 }
 
 void tearDown(void) {
-    // Cleanup code
+    neoc_cleanup();
 }
 
 void test_transaction_builder_create(void) {
@@ -250,4 +252,3 @@ int main(void) {
     
     return UnityEnd();
 }
-

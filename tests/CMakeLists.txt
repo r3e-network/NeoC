@@ -42,16 +42,16 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 # Find OpenSSL (required for crypto operations)
 find_package(OpenSSL REQUIRED)
 
-# Find the NeoC library
-find_path(NEOC_INCLUDE_DIR neoc/neoc.h HINTS ../include)
-find_library(NEOC_LIBRARY neoc HINTS ../build)
-
-if(NOT NEOC_INCLUDE_DIR OR NOT NEOC_LIBRARY)
-    # Build against local source
-    include_directories(../include)
-    link_directories(../build)
+# Prefer linking against the in-tree target when building NeoC from source.
+if(TARGET neoc)
+    include_directories(${CMAKE_SOURCE_DIR}/include)
     set(NEOC_LIBS neoc)
 else()
+    find_path(NEOC_INCLUDE_DIR neoc/neoc.h HINTS ../include)
+    find_library(NEOC_LIBRARY neoc HINTS ../build)
+    if(NOT NEOC_INCLUDE_DIR OR NOT NEOC_LIBRARY)
+        message(FATAL_ERROR "NeoC headers/library not found. Build NeoC first or install the SDK.")
+    endif()
     include_directories(${NEOC_INCLUDE_DIR})
     set(NEOC_LIBS ${NEOC_LIBRARY})
 endif()
@@ -139,6 +139,27 @@ target_link_libraries(test_nep2 unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
 
 add_executable(test_neo_constants test_neo_constants.c)
 target_link_libraries(test_neo_constants unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
+add_executable(test_neo_get_mem_pool test_neo_get_mem_pool.c)
+target_link_libraries(test_neo_get_mem_pool unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
+add_executable(test_neo_get_token_balances test_neo_get_token_balances.c)
+target_link_libraries(test_neo_get_token_balances unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
+add_executable(test_neo_get_nep17_balances test_neo_get_nep17_balances.c)
+target_link_libraries(test_neo_get_nep17_balances unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
+add_executable(test_neo_get_nep17_transfers test_neo_get_nep17_transfers.c)
+target_link_libraries(test_neo_get_nep17_transfers unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
+add_executable(test_neo_get_nep11_balances test_neo_get_nep11_balances.c)
+target_link_libraries(test_neo_get_nep11_balances unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
+add_executable(test_neo_get_nep11_transfers test_neo_get_nep11_transfers.c)
+target_link_libraries(test_neo_get_nep11_transfers unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
+add_executable(test_neo_get_next_block_validators test_neo_get_next_block_validators.c)
+target_link_libraries(test_neo_get_next_block_validators unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
 
 add_executable(test_type_conversions test_type_conversions.c)
 target_link_libraries(test_type_conversions unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
@@ -402,6 +423,48 @@ add_test(NAME NeoConstantsTests COMMAND test_neo_constants)
 set_tests_properties(NeoConstantsTests PROPERTIES 
     TIMEOUT 60
     LABELS "constants;unit"
+)
+
+add_test(NAME NeoGetMemPoolTests COMMAND test_neo_get_mem_pool)
+set_tests_properties(NeoGetMemPoolTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;rpc;unit"
+)
+
+add_test(NAME NeoGetTokenBalancesTests COMMAND test_neo_get_token_balances)
+set_tests_properties(NeoGetTokenBalancesTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;rpc;unit"
+)
+
+add_test(NAME NeoGetNep17BalancesTests COMMAND test_neo_get_nep17_balances)
+set_tests_properties(NeoGetNep17BalancesTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;rpc;unit"
+)
+
+add_test(NAME NeoGetNep17TransfersTests COMMAND test_neo_get_nep17_transfers)
+set_tests_properties(NeoGetNep17TransfersTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;rpc;unit"
+)
+
+add_test(NAME NeoGetNep11BalancesTests COMMAND test_neo_get_nep11_balances)
+set_tests_properties(NeoGetNep11BalancesTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;rpc;unit"
+)
+
+add_test(NAME NeoGetNep11TransfersTests COMMAND test_neo_get_nep11_transfers)
+set_tests_properties(NeoGetNep11TransfersTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;rpc;unit"
+)
+
+add_test(NAME NeoGetNextBlockValidatorsTests COMMAND test_neo_get_next_block_validators)
+set_tests_properties(NeoGetNextBlockValidatorsTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;rpc;unit"
 )
 
 # Type Conversion tests

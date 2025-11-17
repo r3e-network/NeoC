@@ -15,6 +15,76 @@
 /* Constant zero Hash160 */
 const neoc_hash160_t NEOC_HASH160_ZERO_VALUE = {{0}};
 
+#define NEOC_HASH160_HEX_CHARS (NEOC_HASH160_SIZE * 2)
+
+static const char* skip_hex_prefix(const char* hex) {
+    if (!hex) {
+        return NULL;
+    }
+    if (strlen(hex) >= 2 && hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X')) {
+        return hex + 2;
+    }
+    return hex;
+}
+
+static neoc_error_t decode_exact_hex(const char* hex_string,
+                                     size_t expected_bytes,
+                                     uint8_t* output) {
+    if (!hex_string || !output) {
+        return NEOC_ERROR_NULL_POINTER;
+    }
+    
+    const char* digits = skip_hex_prefix(hex_string);
+    if (!digits) {
+        return NEOC_ERROR_NULL_POINTER;
+    }
+    
+    size_t digits_len = strlen(digits);
+    if (digits_len == 0) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    for (size_t i = 0; i < digits_len; ++i) {
+        if (!neoc_hex_is_valid_char(digits[i])) {
+            return NEOC_ERROR_INVALID_HEX;
+        }
+    }
+    
+    size_t required_chars = expected_bytes * 2;
+    bool odd_length = (digits_len % 2) != 0;
+    size_t padded_len = digits_len + (odd_length ? 1 : 0);
+    
+    if (padded_len > required_chars) {
+        return NEOC_ERROR_BUFFER_TOO_SMALL;
+    }
+    if (padded_len < required_chars) {
+        return NEOC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    char normalized[NEOC_HASH160_HEX_CHARS + 1];
+    if (odd_length) {
+        normalized[0] = '0';
+        memcpy(normalized + 1, digits, digits_len + 1);
+    } else {
+        memcpy(normalized, digits, digits_len + 1);
+    }
+    
+    size_t decoded_length = 0;
+    neoc_error_t result = neoc_hex_decode(normalized, output, expected_bytes, &decoded_length);
+    if (result == NEOC_ERROR_INVALID_FORMAT) {
+        return NEOC_ERROR_INVALID_HEX;
+    }
+    if (result != NEOC_SUCCESS) {
+        return result;
+    }
+    if (decoded_length != expected_bytes) {
+        return (decoded_length < expected_bytes) ? NEOC_ERROR_INVALID_ARGUMENT
+                                                 : NEOC_ERROR_BUFFER_TOO_SMALL;
+    }
+    
+    return NEOC_SUCCESS;
+}
+
 neoc_error_t neoc_hash160_init_zero(neoc_hash160_t* hash) {
     if (!hash) {
         return NEOC_ERROR_NULL_POINTER;
@@ -50,22 +120,7 @@ neoc_error_t neoc_hash160_from_hex(neoc_hash160_t* hash, const char* hex_string)
     if (!hash || !hex_string) {
         return NEOC_ERROR_NULL_POINTER;
     }
-    
-    if (!neoc_hex_is_valid_string(hex_string, true)) {
-        return NEOC_ERROR_INVALID_HEX;
-    }
-    
-    size_t decoded_length;
-    neoc_error_t result = neoc_hex_decode(hex_string, hash->data, NEOC_HASH160_SIZE, &decoded_length);
-    if (result != NEOC_SUCCESS) {
-        return result;
-    }
-    
-    if (decoded_length != NEOC_HASH160_SIZE) {
-        return NEOC_ERROR_INVALID_ARGUMENT;
-    }
-    
-    return NEOC_SUCCESS;
+    return decode_exact_hex(hex_string, NEOC_HASH160_SIZE, hash->data);
 }
 
 neoc_error_t neoc_hash160_from_address(neoc_hash160_t* hash, const char* address) {
@@ -92,8 +147,10 @@ neoc_error_t neoc_hash160_from_address(neoc_hash160_t* hash, const char* address
         return NEOC_ERROR_INVALID_FORMAT;
     }
     
-    /* Extract hash160 (skip version byte) */
-    memcpy(hash->data, decoded + 1, NEOC_HASH160_SIZE);
+    /* Extract hash160 (skip version byte) and store in big-endian order */
+    for (size_t i = 0; i < NEOC_HASH160_SIZE; i++) {
+        hash->data[i] = decoded[1 + NEOC_HASH160_SIZE - 1 - i];
+    }
     
     neoc_secure_free(decoded, decoded_length);
     return NEOC_SUCCESS;
@@ -275,10 +332,12 @@ neoc_error_t neoc_hash160_to_address(const neoc_hash160_t* hash, char* buffer, s
         return NEOC_ERROR_NULL_POINTER;
     }
     
-    /* Create versioned hash (version byte + hash) */
+    /* Create versioned hash (version byte + little-endian script hash) */
     uint8_t versioned[1 + NEOC_HASH160_SIZE];
     versioned[0] = NEOC_ADDRESS_VERSION;
-    memcpy(versioned + 1, hash->data, NEOC_HASH160_SIZE);
+    for (size_t i = 0; i < NEOC_HASH160_SIZE; i++) {
+        versioned[1 + i] = hash->data[NEOC_HASH160_SIZE - 1 - i];
+    }
     
     /* Encode as Base58Check */
     char* address = neoc_base58_check_encode_alloc(versioned, sizeof(versioned));

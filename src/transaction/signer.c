@@ -30,11 +30,19 @@ neoc_error_t neoc_signer_create_called_by_entry(const neoc_hash160_t *account,
                                                  neoc_signer_t **signer) {
     return neoc_signer_create(account, NEOC_WITNESS_SCOPE_CALLED_BY_ENTRY, signer);
 }
-
 neoc_error_t neoc_signer_add_allowed_contract(neoc_signer_t *signer,
                                                const neoc_hash160_t *contract) {
     if (!signer || !contract) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+    }
+    
+    // Global scope cannot have custom contracts
+    if (signer->scopes & NEOC_WITNESS_SCOPE_GLOBAL) {
+        return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Cannot add contracts to global signer");
+    }
+    
+    if (signer->allowed_contracts_count >= NEOC_MAX_SIGNER_SUBITEMS) {
+        return neoc_error_set(NEOC_ERROR_INVALID_SIZE, "Too many allowed contracts");
     }
     
     // Add CUSTOM_CONTRACTS scope
@@ -61,6 +69,15 @@ neoc_error_t neoc_signer_add_allowed_group(neoc_signer_t *signer,
                                             size_t pubkey_size) {
     if (!signer || !group_pubkey || pubkey_size == 0) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+    }
+    
+    // Global scope cannot have custom groups
+    if (signer->scopes & NEOC_WITNESS_SCOPE_GLOBAL) {
+        return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Cannot add groups to global signer");
+    }
+    
+    if (signer->allowed_groups_count >= NEOC_MAX_SIGNER_SUBITEMS) {
+        return neoc_error_set(NEOC_ERROR_INVALID_SIZE, "Too many allowed groups");
     }
     
     // Add CUSTOM_GROUPS scope
@@ -219,9 +236,26 @@ neoc_error_t neoc_signer_copy(const neoc_signer_t *source, neoc_signer_t **dest)
         (*dest)->allowed_groups_count = source->allowed_groups_count;
     }
     
-    // Note: Copy witness rules when implemented
     if (source->rules_count > 0 && source->rules) {
-        // Rules copying will be implemented when witness rules are defined
+        (*dest)->rules = calloc(source->rules_count, sizeof(neoc_witness_rule_t*));
+        if (!(*dest)->rules) {
+            neoc_signer_free(*dest);
+            *dest = NULL;
+            return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate witness rules");
+        }
+
+        for (size_t i = 0; i < source->rules_count; i++) {
+            if (!source->rules[i]) {
+                continue;
+            }
+            neoc_error_t rule_err = neoc_witness_rule_clone(source->rules[i], &(*dest)->rules[i]);
+            if (rule_err != NEOC_SUCCESS) {
+                neoc_signer_free(*dest);
+                *dest = NULL;
+                return rule_err;
+            }
+        }
+        (*dest)->rules_count = source->rules_count;
     }
     
     return NEOC_SUCCESS;
@@ -257,8 +291,12 @@ void neoc_signer_free(neoc_signer_t *signer) {
     }
     
     if (signer->rules) {
-        // Note: Free witness rules when implemented
-        free(signer->rules);
+        for (size_t i = 0; i < signer->rules_count; i++) {
+            if (signer->rules[i]) {
+                neoc_witness_rule_free(signer->rules[i]);
+            }
+        }
+        neoc_free(signer->rules);
     }
     
     free(signer);
@@ -306,12 +344,17 @@ neoc_error_t neoc_signer_serialize(const neoc_signer_t *signer, neoc_binary_writ
         
         // Write each witness rule
         for (size_t i = 0; i < signer->rules_count && signer->rules; i++) {
-            // Write rule action (1 byte)
-            err = neoc_binary_writer_write_byte(writer, signer->rules[i].action);
+            neoc_witness_rule_t *rule = signer->rules[i];
+            if (!rule) {
+                err = neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Witness rule is NULL");
+                return err;
+            }
+
+            err = neoc_binary_writer_write_byte(writer, (uint8_t)rule->action);
             if (err != NEOC_SUCCESS) return err;
             
             // Write rule condition
-            err = neoc_witness_condition_serialize(signer->rules[i].condition, writer);
+            err = neoc_witness_condition_serialize(rule->condition, writer);
             if (err != NEOC_SUCCESS) return err;
         }
     }

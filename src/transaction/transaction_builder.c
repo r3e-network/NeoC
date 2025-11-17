@@ -65,6 +65,10 @@ neoc_error_t neoc_tx_builder_create(neoc_tx_builder_t **builder) {
     return NEOC_SUCCESS;
 }
 
+neoc_error_t neoc_transaction_builder_create(neoc_transaction_builder_t **builder) {
+    return neoc_tx_builder_create(builder);
+}
+
 neoc_error_t neoc_tx_builder_set_version(neoc_tx_builder_t *builder, uint8_t version) {
     if (!builder) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid builder");
@@ -72,6 +76,10 @@ neoc_error_t neoc_tx_builder_set_version(neoc_tx_builder_t *builder, uint8_t ver
     
     builder->version = version;
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_transaction_builder_set_version(neoc_transaction_builder_t *builder, uint8_t version) {
+    return neoc_tx_builder_set_version(builder, version);
 }
 
 neoc_error_t neoc_tx_builder_set_nonce(neoc_tx_builder_t *builder, uint32_t nonce) {
@@ -83,6 +91,10 @@ neoc_error_t neoc_tx_builder_set_nonce(neoc_tx_builder_t *builder, uint32_t nonc
     return NEOC_SUCCESS;
 }
 
+neoc_error_t neoc_transaction_builder_set_nonce(neoc_transaction_builder_t *builder, uint32_t nonce) {
+    return neoc_tx_builder_set_nonce(builder, nonce);
+}
+
 neoc_error_t neoc_tx_builder_set_valid_until_block(neoc_tx_builder_t *builder, 
                                                      uint32_t block_height) {
     if (!builder) {
@@ -91,6 +103,11 @@ neoc_error_t neoc_tx_builder_set_valid_until_block(neoc_tx_builder_t *builder,
     
     builder->valid_until_block = block_height;
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_transaction_builder_set_valid_until_block(neoc_transaction_builder_t *builder,
+                                                            uint32_t block_height) {
+    return neoc_tx_builder_set_valid_until_block(builder, block_height);
 }
 
 neoc_error_t neoc_tx_builder_set_script(neoc_tx_builder_t *builder,
@@ -120,6 +137,12 @@ neoc_error_t neoc_tx_builder_set_script(neoc_tx_builder_t *builder,
     return NEOC_SUCCESS;
 }
 
+neoc_error_t neoc_transaction_builder_set_script(neoc_transaction_builder_t *builder,
+                                                 const uint8_t *script,
+                                                 size_t script_size) {
+    return neoc_tx_builder_set_script(builder, script, script_size);
+}
+
 neoc_error_t neoc_tx_builder_add_signer(neoc_tx_builder_t *builder,
                                          const neoc_signer_t *signer) {
     if (!builder || !signer) {
@@ -140,6 +163,11 @@ neoc_error_t neoc_tx_builder_add_signer(neoc_tx_builder_t *builder,
     builder->signers[builder->signer_count++] = new_signer;
     
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_transaction_builder_add_signer(neoc_transaction_builder_t *builder,
+                                                 const neoc_signer_t *signer) {
+    return neoc_tx_builder_add_signer(builder, signer);
 }
 
 neoc_error_t neoc_tx_builder_add_signer_from_account(neoc_tx_builder_t *builder,
@@ -167,6 +195,12 @@ neoc_error_t neoc_tx_builder_add_signer_from_account(neoc_tx_builder_t *builder,
     neoc_signer_free(signer);
     
     return err;
+}
+
+neoc_error_t neoc_transaction_builder_add_signer_from_account(neoc_transaction_builder_t *builder,
+                                                              const neoc_account_t *account,
+                                                              neoc_witness_scope_t scope) {
+    return neoc_tx_builder_add_signer_from_account(builder, account, scope);
 }
 
 neoc_error_t neoc_tx_builder_set_first_signer(neoc_tx_builder_t *builder,
@@ -209,8 +243,13 @@ neoc_error_t neoc_tx_builder_set_first_signer(neoc_tx_builder_t *builder,
     return NEOC_SUCCESS;
 }
 
+neoc_error_t neoc_transaction_builder_set_first_signer(neoc_transaction_builder_t *builder,
+                                                       const neoc_account_t *account) {
+    return neoc_tx_builder_set_first_signer(builder, account);
+}
+
 neoc_error_t neoc_tx_builder_add_attribute(neoc_tx_builder_t *builder,
-                                           const neoc_tx_attribute_t *attribute) {
+                                            const neoc_tx_attribute_t *attribute) {
     if (!builder || !attribute) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
@@ -281,6 +320,11 @@ neoc_error_t neoc_tx_builder_add_network_fee(neoc_tx_builder_t *builder,
     return NEOC_SUCCESS;
 }
 
+neoc_error_t neoc_transaction_builder_add_network_fee(neoc_transaction_builder_t *builder,
+                                                      uint64_t fee) {
+    return neoc_tx_builder_add_network_fee(builder, fee);
+}
+
 neoc_error_t neoc_tx_builder_add_system_fee(neoc_tx_builder_t *builder,
                                              uint64_t fee) {
     if (!builder) {
@@ -289,6 +333,11 @@ neoc_error_t neoc_tx_builder_add_system_fee(neoc_tx_builder_t *builder,
     
     builder->system_fee += fee;
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_transaction_builder_add_system_fee(neoc_transaction_builder_t *builder,
+                                                     uint64_t fee) {
+    return neoc_tx_builder_add_system_fee(builder, fee);
 }
 
 neoc_error_t neoc_tx_builder_calculate_fees(neoc_tx_builder_t *builder,
@@ -314,27 +363,32 @@ neoc_error_t neoc_tx_builder_calculate_fees(neoc_tx_builder_t *builder,
     }
     
     // Calculate network fee based on transaction size
-    uint8_t *tx_bytes = NULL;
-    size_t tx_size = 0;
-    err = neoc_transaction_serialize(temp_tx, &tx_bytes, &tx_size);
-    if (err == NEOC_SUCCESS && tx_bytes) {
-        // Base fee + size fee (1000 GAS per byte)
-        uint64_t size_fee = tx_size * 1000;
-        
-        // Add signature verification fee (1000000 GAS per signature)
-        uint64_t sig_fee = builder->signers_count * 1000000;
-        
-        *network_fee = size_fee + sig_fee;
-        
-        // Ensure minimum network fee
-        if (*network_fee < 100000) {
-            *network_fee = 100000; // 0.001 GAS minimum
+    size_t serialized_size = neoc_transaction_get_size(temp_tx);
+    uint8_t *tx_bytes = neoc_malloc(serialized_size);
+    if (!tx_bytes) {
+        neoc_transaction_free(temp_tx);
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate transaction buffer");
+    }
+
+    size_t written = 0;
+    err = neoc_transaction_serialize(temp_tx, tx_bytes, serialized_size, &written);
+    if (err == NEOC_SUCCESS) {
+        if (written < serialized_size) {
+            serialized_size = written;
         }
-        
-        neoc_free(tx_bytes);
+
+        uint64_t size_fee = serialized_size * 1000;
+        uint64_t sig_fee = builder->signer_count * 1000000;
+
+        *network_fee = size_fee + sig_fee;
+
+        if (*network_fee < 100000) {
+            *network_fee = 100000;
+        }
     } else {
         *network_fee = builder->network_fee > 0 ? builder->network_fee : 100000;
     }
+    neoc_free(tx_bytes);
     
     // Calculate system fee by invoking script with RPC client
     // Use the builder's system fee if set, otherwise estimate based on script complexity
@@ -349,7 +403,7 @@ neoc_error_t neoc_tx_builder_calculate_fees(neoc_tx_builder_t *builder,
         uint64_t size_fee = builder->script_size * 10000;
         
         // Add cost for each contract invocation (0.01 GAS per invocation)
-        uint64_t invocation_fee = builder->invocation_count * 1000000;
+        uint64_t invocation_fee = 0;
         
         *system_fee = base_fee + size_fee + invocation_fee;
     }
@@ -395,7 +449,9 @@ neoc_error_t neoc_tx_builder_build_unsigned(neoc_tx_builder_t *builder,
             *transaction = NULL;
             return err;
         }
+        builder->signers[i] = NULL;
     }
+    builder->signer_count = 0;
     
     // Store reference to built transaction
     if (builder->built_transaction) {
@@ -404,6 +460,11 @@ neoc_error_t neoc_tx_builder_build_unsigned(neoc_tx_builder_t *builder,
     builder->built_transaction = *transaction;
     
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_transaction_builder_build(neoc_transaction_builder_t *builder,
+                                            neoc_transaction_t **transaction) {
+    return neoc_tx_builder_build_unsigned(builder, transaction);
 }
 
 neoc_error_t neoc_tx_builder_sign(neoc_tx_builder_t *builder,
@@ -427,6 +488,12 @@ neoc_error_t neoc_tx_builder_sign(neoc_tx_builder_t *builder,
     
     builder->is_signed = true;
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_transaction_builder_sign(neoc_transaction_builder_t *builder,
+                                           neoc_account_t **accounts,
+                                           size_t account_count) {
+    return neoc_tx_builder_sign(builder, accounts, account_count);
 }
 
 neoc_error_t neoc_tx_builder_build_and_sign(neoc_tx_builder_t *builder,
@@ -454,17 +521,29 @@ neoc_error_t neoc_tx_builder_build_and_sign(neoc_tx_builder_t *builder,
     return NEOC_SUCCESS;
 }
 
+neoc_error_t neoc_transaction_builder_build_and_sign(neoc_transaction_builder_t *builder,
+                                                     neoc_account_t **accounts,
+                                                     size_t account_count,
+                                                     neoc_transaction_t **transaction) {
+    return neoc_tx_builder_build_and_sign(builder, accounts, account_count, transaction);
+}
+
 neoc_error_t neoc_tx_builder_get_hash(const neoc_tx_builder_t *builder,
                                        neoc_hash256_t *hash) {
     if (!builder || !hash) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
     
-    if (!builder->built_transaction) {
-        return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Transaction not built");
+    neoc_tx_builder_t *mutable_builder = (neoc_tx_builder_t *)builder;
+    if (!mutable_builder->built_transaction) {
+        neoc_transaction_t *tx = NULL;
+        neoc_error_t err = neoc_tx_builder_build_unsigned(mutable_builder, &tx);
+        if (err != NEOC_SUCCESS) {
+            return err;
+        }
     }
     
-    return neoc_transaction_get_hash(builder->built_transaction, hash);
+    return neoc_transaction_calculate_hash(mutable_builder->built_transaction, hash);
 }
 
 neoc_error_t neoc_tx_builder_serialize(const neoc_tx_builder_t *builder,
@@ -480,6 +559,13 @@ neoc_error_t neoc_tx_builder_serialize(const neoc_tx_builder_t *builder,
     }
     
     return neoc_transaction_serialize(builder->built_transaction, buffer, buffer_size, serialized_size);
+}
+
+neoc_error_t neoc_transaction_builder_serialize(const neoc_transaction_builder_t *builder,
+                                                uint8_t *buffer,
+                                                size_t buffer_size,
+                                                size_t *serialized_size) {
+    return neoc_tx_builder_serialize(builder, buffer, buffer_size, serialized_size);
 }
 
 neoc_error_t neoc_tx_builder_create_nep17_transfer(const neoc_hash160_t *token_hash,
@@ -742,4 +828,8 @@ void neoc_tx_builder_free(neoc_tx_builder_t *builder) {
     // Note: Don't free built_transaction here as it's returned to the caller
     
     neoc_free(builder);
+}
+
+void neoc_transaction_builder_free(neoc_transaction_builder_t *builder) {
+    neoc_tx_builder_free(builder);
 }
