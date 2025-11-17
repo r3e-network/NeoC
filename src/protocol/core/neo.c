@@ -820,10 +820,51 @@ neoc_error_t neoc_neo_get_transaction(neoc_neo_client_t *client, const neoc_hash
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments to neoc_neo_get_transaction");
     }
 
-    (void)client;
-    (void)tx_hash;
-    (void)transaction;
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Transaction retrieval bridge not implemented yet");
+    neoc_error_t err = neoc_ensure_rpc_client(client);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    neoc_rpc_transaction_t *rpc_tx = NULL;
+    err = neoc_rpc_get_transaction(client->rpc_client, tx_hash, true, &rpc_tx);
+    if (err != NEOC_SUCCESS || !rpc_tx) {
+        return err != NEOC_SUCCESS ? err : NEOC_ERROR_INVALID_STATE;
+    }
+
+    neoc_transaction_t *tx = NULL;
+    err = neoc_transaction_create(&tx);
+    if (err != NEOC_SUCCESS) {
+        neoc_rpc_transaction_free(rpc_tx);
+        return err;
+    }
+
+    tx->version = (uint8_t)rpc_tx->version;
+    tx->nonce = rpc_tx->nonce;
+    tx->system_fee = rpc_tx->system_fee;
+    tx->network_fee = rpc_tx->network_fee;
+    tx->valid_until_block = rpc_tx->valid_until_block;
+
+    if (rpc_tx->script && rpc_tx->script_size > 0) {
+        tx->script = neoc_malloc(rpc_tx->script_size);
+        if (!tx->script) {
+            neoc_rpc_transaction_free(rpc_tx);
+            neoc_transaction_free(tx);
+            return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate transaction script");
+        }
+        memcpy(tx->script, rpc_tx->script, rpc_tx->script_size);
+        tx->script_len = rpc_tx->script_size;
+    }
+
+    tx->attribute_count = 0;
+    tx->attributes = NULL;
+    tx->signer_count = 0;
+    tx->signers = NULL;
+    tx->witness_count = 0;
+    tx->witnesses = NULL;
+
+    neoc_rpc_transaction_free(rpc_tx);
+    *transaction = tx;
+    return NEOC_SUCCESS;
 }
 
 // MARK: Node Methods
