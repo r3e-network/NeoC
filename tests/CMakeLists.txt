@@ -179,6 +179,9 @@ target_link_libraries(test_binary_writer unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL
 add_executable(test_data_validation test_data_validation.c)
 target_link_libraries(test_data_validation unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
 
+add_executable(test_neo_c_express test_neo_c_express.c)
+target_link_libraries(test_neo_c_express unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
 find_package(CURL REQUIRED)
 find_library(CJSON_LIBRARY cjson)
 if(NOT CJSON_LIBRARY)
@@ -465,6 +468,12 @@ add_test(NAME NeoGetNextBlockValidatorsTests COMMAND test_neo_get_next_block_val
 set_tests_properties(NeoGetNextBlockValidatorsTests PROPERTIES
     TIMEOUT 60
     LABELS "protocol;rpc;unit"
+)
+
+add_test(NAME NeoCExpressTests COMMAND test_neo_c_express)
+set_tests_properties(NeoCExpressTests PROPERTIES
+    TIMEOUT 60
+    LABELS "protocol;express;unit"
 )
 
 # Type Conversion tests

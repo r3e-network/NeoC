@@ -27,7 +27,10 @@ extern "C" {
 /**
  * @brief Forward declarations
  */
+struct neoc_neo_c_t;
 typedef struct neoc_neo_c_t neoc_neo_c_t;
+
+struct neoc_neo_c_rx_t;
 typedef struct neoc_neo_c_rx_t neoc_neo_c_rx_t;
 
 /**
@@ -36,11 +39,11 @@ typedef struct neoc_neo_c_rx_t neoc_neo_c_rx_t;
  * Based on Swift NeoSwift class
  * Combines Neo protocol functionality with reactive extensions
  */
-typedef struct neoc_neo_c_t {
+struct neoc_neo_c_t {
     neoc_neo_c_config_t *config;    /**< Client configuration */
     neoc_service_t *neo_c_service;  /**< Underlying service implementation */
     neoc_neo_c_rx_t *neo_c_rx;  /**< Reactive extensions (lazy initialized) */
-} neoc_neo_c_t;
+};
 
 /**
  * @brief Callback function for asynchronous operations

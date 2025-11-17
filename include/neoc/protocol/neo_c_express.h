@@ -214,6 +214,15 @@ neoc_error_t neoc_neo_c_express_create_checkpoint_async(neoc_neo_c_express_t *ex
                                                            void (*callback)(neoc_response_t *response, neoc_error_t error, void *user_data),
                                                            void *user_data);
 
+neoc_error_t neoc_neo_c_express_list_oracle_requests_async(neoc_neo_c_express_t *express,
+                                                              void (*callback)(neoc_response_t *response, neoc_error_t error, void *user_data),
+                                                              void *user_data);
+
+neoc_error_t neoc_neo_c_express_create_oracle_response_tx_async(neoc_neo_c_express_t *express,
+                                                                   const neoc_transaction_attribute_t *oracle_response,
+                                                                   void (*callback)(neoc_response_t *response, neoc_error_t error, void *user_data),
+                                                                   void *user_data);
+
 /**
  * @brief Shutdown neo-express asynchronously
  * @param express Express client

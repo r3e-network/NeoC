@@ -24,8 +24,14 @@ extern "C" {
 /**
  * @brief Forward declarations
  */
+struct neoc_service_t;
 typedef struct neoc_service_t neoc_service_t;
+
+struct neoc_response_t;
 typedef struct neoc_response_t neoc_response_t;
+#ifndef NEOC_RESPONSE_TYPEDEF_COMPLETE
+#define NEOC_RESPONSE_TYPEDEF_COMPLETE
+#endif
 
 /**
  * @brief Service type enumeration

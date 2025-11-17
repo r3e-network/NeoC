@@ -25,6 +25,7 @@ extern "C" {
 /**
  * @brief Forward declarations
  */
+struct neoc_neo_c_service_t;
 typedef struct neoc_neo_c_service_t neoc_neo_c_service_t;
 
 /**
@@ -78,10 +79,10 @@ typedef struct {
  * Based on Swift NeoSwiftService protocol
  * Provides foundation for all Neo service implementations
  */
-typedef struct neoc_neo_c_service_t {
+struct neoc_neo_c_service_t {
     const neoc_neo_c_service_vtable_t *vtable; /**< Virtual function table */
     void *impl_data;                    /**< Implementation-specific data */
-} neoc_neo_c_service_t;
+};
 
 /**
  * @brief Get request ID
