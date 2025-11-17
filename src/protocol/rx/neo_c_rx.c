@@ -22,12 +22,11 @@ neoc_error_t neoc_neo_c_rx_block_publisher(neoc_neo_c_rx_t *rx,
                                            neoc_block_callback_t callback,
                                            void *user_data,
                                            neoc_subscription_t **subscription_out) {
-    (void)rx;
-    (void)full_transaction_objects;
-    (void)callback;
-    (void)user_data;
     if (subscription_out) {
         *subscription_out = NULL;
+    }
+    if (rx && rx->vtable && rx->vtable->block_publisher) {
+        return rx->vtable->block_publisher(rx, full_transaction_objects, callback, user_data, subscription_out);
     }
     return rx_not_supported();
 }
@@ -39,14 +38,13 @@ neoc_error_t neoc_neo_c_rx_replay_blocks_publisher(neoc_neo_c_rx_t *rx,
                                                    neoc_block_callback_t callback,
                                                    void *user_data,
                                                    neoc_subscription_t **subscription_out) {
-    (void)rx;
-    (void)start_block;
-    (void)end_block;
-    (void)full_transaction_objects;
-    (void)callback;
-    (void)user_data;
     if (subscription_out) {
         *subscription_out = NULL;
+    }
+    if (rx && rx->vtable && rx->vtable->replay_blocks_publisher) {
+        return rx->vtable->replay_blocks_publisher(rx, start_block, end_block,
+                                                   full_transaction_objects,
+                                                   callback, user_data, subscription_out);
     }
     return rx_not_supported();
 }
@@ -59,15 +57,13 @@ neoc_error_t neoc_neo_c_rx_replay_blocks_publisher_ordered(neoc_neo_c_rx_t *rx,
                                                            neoc_block_callback_t callback,
                                                            void *user_data,
                                                            neoc_subscription_t **subscription_out) {
-    (void)rx;
-    (void)start_block;
-    (void)end_block;
-    (void)full_transaction_objects;
-    (void)ascending;
-    (void)callback;
-    (void)user_data;
     if (subscription_out) {
         *subscription_out = NULL;
+    }
+    if (rx && rx->vtable && rx->vtable->replay_blocks_publisher_ordered) {
+        return rx->vtable->replay_blocks_publisher_ordered(rx, start_block, end_block,
+                                                           full_transaction_objects, ascending,
+                                                           callback, user_data, subscription_out);
     }
     return rx_not_supported();
 }
@@ -78,13 +74,14 @@ neoc_error_t neoc_neo_c_rx_catch_up_to_latest_block_publisher(neoc_neo_c_rx_t *r
                                                               neoc_block_callback_t callback,
                                                               void *user_data,
                                                               neoc_subscription_t **subscription_out) {
-    (void)rx;
-    (void)start_block;
-    (void)full_transaction_objects;
-    (void)callback;
-    (void)user_data;
     if (subscription_out) {
         *subscription_out = NULL;
+    }
+    if (rx && rx->vtable && rx->vtable->catch_up_to_latest_block_publisher) {
+        return rx->vtable->catch_up_to_latest_block_publisher(rx, start_block,
+                                                              full_transaction_objects,
+                                                              callback, user_data,
+                                                              subscription_out);
     }
     return rx_not_supported();
 }
@@ -96,13 +93,13 @@ neoc_error_t neoc_neo_c_rx_catch_up_to_latest_and_subscribe_to_new_blocks_publis
     neoc_block_callback_t callback,
     void *user_data,
     neoc_subscription_t **subscription_out) {
-    (void)rx;
-    (void)start_block;
-    (void)full_transaction_objects;
-    (void)callback;
-    (void)user_data;
     if (subscription_out) {
         *subscription_out = NULL;
+    }
+    if (rx && rx->vtable &&
+        rx->vtable->catch_up_to_latest_and_subscribe_to_new_blocks_publisher) {
+        return rx->vtable->catch_up_to_latest_and_subscribe_to_new_blocks_publisher(
+            rx, start_block, full_transaction_objects, callback, user_data, subscription_out);
     }
     return rx_not_supported();
 }
@@ -112,16 +109,21 @@ neoc_error_t neoc_neo_c_rx_subscribe_to_new_blocks_publisher(neoc_neo_c_rx_t *rx
                                                              neoc_block_callback_t callback,
                                                              void *user_data,
                                                              neoc_subscription_t **subscription_out) {
-    (void)rx;
-    (void)full_transaction_objects;
-    (void)callback;
-    (void)user_data;
     if (subscription_out) {
         *subscription_out = NULL;
+    }
+    if (rx && rx->vtable && rx->vtable->subscribe_to_new_blocks_publisher) {
+        return rx->vtable->subscribe_to_new_blocks_publisher(
+            rx, full_transaction_objects, callback, user_data, subscription_out);
     }
     return rx_not_supported();
 }
 
 void neoc_neo_c_rx_free(neoc_neo_c_rx_t *rx) {
-    (void)rx;
+    if (!rx) {
+        return;
+    }
+    if (rx->vtable && rx->vtable->free_impl) {
+        rx->vtable->free_impl(rx);
+    }
 }
