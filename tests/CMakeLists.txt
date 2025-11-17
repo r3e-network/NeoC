@@ -495,14 +495,14 @@ set_tests_properties(BIP39VectorTests PROPERTIES
     LABELS "crypto;bip39;vectors"
 )
 
-# Multi-signature tests (disabled temporarily)
-# add_executable(test_multi_sig test_multi_sig.c)
-# target_link_libraries(test_multi_sig unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto ${CURL_LIBRARIES} ${CJSON_LIBRARY})
-# add_test(NAME MultiSigTests COMMAND test_multi_sig)
-# set_tests_properties(MultiSigTests PROPERTIES 
-#     TIMEOUT 60
-#     LABELS "wallet;multisig;unit"
-# )
+# Multi-signature tests
+add_executable(test_multi_sig test_multi_sig.c)
+target_link_libraries(test_multi_sig unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+add_test(NAME MultiSigTests COMMAND test_multi_sig)
+set_tests_properties(MultiSigTests PROPERTIES 
+    TIMEOUT 60
+    LABELS "wallet;multisig;unit"
+)
 
 # Integration tests
 add_test(NAME IntegrationTests COMMAND test_integration)

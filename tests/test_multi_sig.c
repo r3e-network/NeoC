@@ -10,6 +10,7 @@
 #include "neoc/neoc.h"
 #include "neoc/wallet/multi_sig.h"
 #include "neoc/crypto/ec_key_pair.h"
+#include "neoc/script/opcode.h"
 
 void setUp(void) {
     neoc_error_t result = neoc_init();
@@ -95,10 +96,11 @@ void test_multi_sig_verification_script(void) {
     TEST_ASSERT_TRUE(actual_size <= sizeof(script));
     
     // Verify script starts with PUSH1 (threshold = 1)
-    TEST_ASSERT_EQUAL_HEX8(0x51, script[0]); // PUSH1 opcode
+    TEST_ASSERT_EQUAL_HEX8(NEOC_OP_PUSH1, script[0]);
     
-    // Verify script ends with CHECKMULTISIG
-    TEST_ASSERT_EQUAL_HEX8(0xae, script[actual_size - 1]); // CHECKMULTISIG opcode
+    // Verify script contains SYSCALL near the end
+    TEST_ASSERT_TRUE(actual_size >= 5);
+    TEST_ASSERT_EQUAL_HEX8(NEOC_OP_SYSCALL, script[actual_size - 5]);
     
     // Clean up
     neoc_multi_sig_free(account);
@@ -128,7 +130,7 @@ void test_multi_sig_script_hash(void) {
     // Verify hash is not zero
     neoc_hash160_t zero_hash;
     neoc_hash160_init_zero(&zero_hash);
-    TEST_ASSERT_FALSE(neoc_hash160_equals(&hash, &zero_hash));
+    TEST_ASSERT_FALSE(neoc_hash160_equal(&hash, &zero_hash));
     
     // Clean up
     neoc_multi_sig_free(account);
@@ -181,12 +183,12 @@ void test_multi_sig_invalid_threshold(void) {
     
     // Test threshold = 0
     err = neoc_multi_sig_create(0, &pub_key, 1, &account);
-    TEST_ASSERT_NOT_EQUAL_INT(NEOC_SUCCESS, err);
+    TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     TEST_ASSERT_NULL(account);
     
     // Test threshold > key count
     err = neoc_multi_sig_create(2, &pub_key, 1, &account);
-    TEST_ASSERT_NOT_EQUAL_INT(NEOC_SUCCESS, err);
+    TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     TEST_ASSERT_NULL(account);
     
     neoc_ec_key_pair_free(key);
