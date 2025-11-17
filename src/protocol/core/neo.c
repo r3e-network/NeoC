@@ -741,16 +741,18 @@ neoc_error_t neoc_neo_get_network_magic_number(neoc_neo_client_t *client, int *m
 
     cJSON_Delete(root);
 #else
-    err = neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "cJSON support required to parse getversion response");
+    /* Fallback: naive scan for network magic without cJSON */
+    const char *needle = "\"network\"";
+    const char *found = strstr(version_json, needle);
+    if (found) {
+        const char *colon = strchr(found, ':');
+        if (colon) {
+            magic = (int)strtol(colon + 1, NULL, 10);
+        }
+    }
 #endif
 
     free(version_json);
-
-#ifndef HAVE_CJSON
-    if (err != NEOC_SUCCESS) {
-        return err;
-    }
-#endif
 
     if (magic <= 0) {
         return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Network magic number missing in version response");
