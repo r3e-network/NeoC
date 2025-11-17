@@ -1,23 +1,32 @@
 #include "neoc/protocol/core/polling/block_index_polling.h"
-
-static neoc_error_t neoc_block_index_polling_not_impl(const char *fn) {
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED,
-                          fn ? fn : "Block index polling not implemented");
-}
+#include "neoc/protocol/neo_c.h"
+#include "neoc/protocol/core/neo.h"
+#include <string.h>
 
 neoc_error_t neoc_block_index_polling_create(
     int polling_interval_ms,
     neoc_block_index_polling_t **polling) {
-    (void)polling_interval_ms;
-    if (polling) {
-        *polling = NULL;
+    if (!polling) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Polling output is NULL");
     }
-    return neoc_block_index_polling_not_impl("neoc_block_index_polling_create");
+    *polling = NULL;
+
+    neoc_block_index_polling_t *obj = neoc_calloc(1, sizeof(neoc_block_index_polling_t));
+    if (!obj) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate block index polling");
+    }
+
+    obj->current_block_index = -1;
+    obj->polling_interval_ms = polling_interval_ms > 0 ? polling_interval_ms : 15000;
+    obj->is_initialized = true;
+    *polling = obj;
+    return NEOC_SUCCESS;
 }
 
 void neoc_block_index_polling_free(
     neoc_block_index_polling_t *polling) {
-    (void)polling;
+    if (!polling) return;
+    neoc_free(polling);
 }
 
 neoc_error_t neoc_block_index_polling_start(
@@ -26,18 +35,32 @@ neoc_error_t neoc_block_index_polling_start(
     neoc_block_index_callback_t callback,
     neoc_polling_error_callback_t error_callback,
     void *user_data) {
-    (void)polling;
-    (void)neo_c;
-    (void)callback;
-    (void)error_callback;
-    (void)user_data;
-    return neoc_block_index_polling_not_impl("neoc_block_index_polling_start");
+    if (!polling || !neo_c || !callback) {
+        if (error_callback) {
+            error_callback(NEOC_ERROR_INVALID_ARGUMENT, "Invalid polling arguments", user_data);
+        }
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid polling arguments");
+    }
+
+    uint32_t latest = 0;
+    neoc_error_t err = neoc_neo_get_block_count((neoc_neo_client_t *)neo_c, &latest);
+    if (err == NEOC_SUCCESS) {
+        polling->current_block_index = (int)latest - 1;
+        int new_index = (int)latest - 1;
+        callback(&new_index, 1, user_data);
+    } else if (error_callback) {
+        const neoc_error_info_t *info = neoc_get_last_error();
+        error_callback(err, info ? info->message : "Polling error", user_data);
+    }
+    return err;
 }
 
 neoc_error_t neoc_block_index_polling_stop(
     neoc_block_index_polling_t *polling) {
-    (void)polling;
-    return neoc_block_index_polling_not_impl("neoc_block_index_polling_stop");
+    if (!polling) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Polling is NULL");
+    }
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_block_index_polling_poll_once(
@@ -45,38 +68,64 @@ neoc_error_t neoc_block_index_polling_poll_once(
     void *neo_c,
     int **new_indices,
     size_t *count) {
-    (void)polling;
-    (void)neo_c;
-    if (new_indices) {
-        *new_indices = NULL;
+    if (!polling || !neo_c || !new_indices || !count) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid poll_once arguments");
     }
-    if (count) {
-        *count = 0;
+    *new_indices = NULL;
+    *count = 0;
+
+    uint32_t latest = 0;
+    neoc_error_t err = neoc_neo_get_block_count((neoc_neo_client_t *)neo_c, &latest);
+    if (err != NEOC_SUCCESS) {
+        return err;
     }
-    return neoc_block_index_polling_not_impl("neoc_block_index_polling_poll_once");
+
+    int current = polling->current_block_index;
+    if ((int)latest <= current) {
+        return NEOC_SUCCESS;
+    }
+
+    size_t diff = (size_t)(latest - current);
+    int *indices = neoc_calloc(diff, sizeof(int));
+    if (!indices) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate indices");
+    }
+    for (size_t i = 0; i < diff; ++i) {
+        indices[i] = current + 1 + (int)i;
+    }
+
+    polling->current_block_index = latest;
+    *new_indices = indices;
+    *count = diff;
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_block_index_polling_get_current_index(
     const neoc_block_index_polling_t *polling,
     int *current_index) {
-    (void)polling;
-    if (current_index) {
-        *current_index = -1;
+    if (!polling || !current_index) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid polling get");
     }
-    return neoc_block_index_polling_not_impl("neoc_block_index_polling_get_current_index");
+    *current_index = polling->current_block_index;
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_block_index_polling_set_current_index(
     neoc_block_index_polling_t *polling,
     int index) {
-    (void)polling;
-    (void)index;
-    return neoc_block_index_polling_not_impl("neoc_block_index_polling_set_current_index");
+    if (!polling) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Polling is NULL");
+    }
+    polling->current_block_index = index;
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_block_index_polling_reset(
     neoc_block_index_polling_t *polling) {
-    (void)polling;
-    return neoc_block_index_polling_not_impl("neoc_block_index_polling_reset");
+    if (!polling) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Polling is NULL");
+    }
+    polling->current_block_index = -1;
+    polling->is_initialized = false;
+    return NEOC_SUCCESS;
 }
-
