@@ -3,38 +3,25 @@
 cmake_minimum_required(VERSION 3.10)
 project(NeoC_Unit_Tests)
 
-# Set C standard
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Include directories
+# Local Unity build for unit tests
+add_library(unit_unity STATIC ../unity.c ../unity.h)
+target_include_directories(unit_unity PUBLIC .. ../../include)
+
+include_directories(..)
 include_directories(../../include)
 
-# Find all test source files
 file(GLOB_RECURSE TEST_SOURCES "*.c")
 
-# Create executables for each test file
 foreach(TEST_SOURCE ${TEST_SOURCES})
-    # Get the test name from the file name
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
-    
-    # Create executable
-    add_executable(${TEST_NAME} ${TEST_SOURCE})
-    
-    # Link with NeoC library
-    target_link_libraries(${TEST_NAME} neoc)
-    
-    # Add as a test
-    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    set(TARGET_NAME unit_${TEST_NAME})
+
+    add_executable(${TARGET_NAME} ${TEST_SOURCE})
+    target_link_libraries(${TARGET_NAME} unit_unity neoc OpenSSL::SSL OpenSSL::Crypto)
+    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
 endforeach()
 
-# Enable testing
 enable_testing()
-
-# Custom target to run all tests
-add_custom_target(run_unit_tests
-    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-    DEPENDS ${TEST_SOURCES}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Running all unit tests"
-)

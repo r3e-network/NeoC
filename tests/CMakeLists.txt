@@ -504,6 +504,12 @@ set_tests_properties(MultiSigTests PROPERTIES
     LABELS "wallet;multisig;unit"
 )
 
+# Optional extra unit tests under tests/unit (off by default to avoid target duplication)
+option(BUILD_EXTRA_UNIT_TESTS "Build additional unit tests under tests/unit" OFF)
+if(BUILD_EXTRA_UNIT_TESTS)
+    add_subdirectory(unit)
+endif()
+
 # Integration tests
 add_test(NAME IntegrationTests COMMAND test_integration)
 set_tests_properties(IntegrationTests PROPERTIES 
