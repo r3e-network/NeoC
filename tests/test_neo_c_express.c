@@ -4,6 +4,7 @@
 #include "neoc/neoc.h"
 #include "neoc/protocol/neo_c_express.h"
 #include "neoc/protocol/core/request.h"
+#include "neoc/protocol/service.h"
 #include "neoc/types/neoc_hash160.h"
 
 static neoc_neo_c_t *create_fake_base(void) {
@@ -144,11 +145,67 @@ void test_express_build_helpers(void) {
     neoc_neo_c_express_free(express);
 }
 
+typedef struct {
+    neoc_response_t *response;
+    neoc_error_t err;
+    bool called;
+} async_ctx_t;
+
+static neoc_error_t mock_perform_io(neoc_service_t *service,
+                                    const neoc_byte_array_t *payload,
+                                    neoc_byte_array_t **result) {
+    (void)service;
+    TEST_ASSERT_NOT_NULL(payload);
+    TEST_ASSERT_NOT_NULL(result);
+    *result = neoc_calloc(1, sizeof(neoc_byte_array_t));
+    TEST_ASSERT_NOT_NULL(*result);
+    const char *resp = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}";
+    size_t len = strlen(resp);
+    (*result)->data = neoc_malloc(len);
+    TEST_ASSERT_NOT_NULL((*result)->data);
+    memcpy((*result)->data, resp, len);
+    (*result)->length = len;
+    (*result)->capacity = len;
+    return NEOC_SUCCESS;
+}
+
+static void async_callback(neoc_response_t *response, neoc_error_t err, void *user_data) {
+    async_ctx_t *ctx = (async_ctx_t *)user_data;
+    ctx->response = response;
+    ctx->err = err;
+    ctx->called = true;
+}
+
+void test_express_async_uses_service(void) {
+    neoc_neo_c_t *base = create_fake_base();
+    neoc_service_t *service = base->neo_c_service;
+    static neoc_service_vtable_t vtable = {0};
+    vtable.perform_io = mock_perform_io;
+    service->vtable = &vtable;
+    service->config.include_raw_responses = false;
+
+    neoc_neo_c_express_t *express = neoc_neo_c_express_create(base);
+    TEST_ASSERT_NOT_NULL(express);
+
+    async_ctx_t ctx = {0};
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
+                          neoc_neo_c_express_get_populated_blocks_async(express,
+                                                                       async_callback,
+                                                                       &ctx));
+    TEST_ASSERT_TRUE(ctx.called);
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, ctx.err);
+    TEST_ASSERT_NOT_NULL(ctx.response);
+    neoc_response_free(ctx.response);
+
+    neoc_neo_c_express_free(express);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_express_create_and_free);
     RUN_TEST(test_express_request_builders);
     RUN_TEST(test_express_error_handling);
     RUN_TEST(test_express_build_helpers);
+    RUN_TEST(test_express_async_uses_service);
     return UnityEnd();
 }
