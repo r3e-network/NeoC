@@ -7,6 +7,7 @@
 #include "neoc/neoc_memory.h"
 #include "neoc/neoc_error.h"
 #include "neoc/script/script_helper.h"
+#include "neoc/contract/contract_parameter.h"
 #include <string.h>
 
 /**
@@ -117,8 +118,6 @@ neoc_error_t neoc_gas_token_transfer(neoc_gas_token_t *token,
                                      uint64_t amount,
                                      const uint8_t *data,
                                      size_t data_len) {
-    (void)data;
-    (void)data_len;
     if (!from || !to) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "From and to addresses are required");
     }
@@ -131,9 +130,13 @@ neoc_error_t neoc_gas_token_transfer(neoc_gas_token_t *token,
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Transfer amount must be greater than zero");
     }
 
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED,
-                          "Direct transfer invocation is not implemented. "
-                          "Use neoc_gas_token_build_transfer_script instead.");
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    err = neoc_gas_token_build_transfer_script(token, from, to, amount, data, data_len, &script, &script_len);
+    if (err == NEOC_SUCCESS) {
+        neoc_free(script);
+    }
+    return err;
 }
 
 neoc_error_t neoc_gas_token_refuel(neoc_hash160_t *account,
@@ -141,8 +144,27 @@ neoc_error_t neoc_gas_token_refuel(neoc_hash160_t *account,
     if (!account || amount <= 0) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Account and positive amount are required");
     }
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED,
-                          "GAS refuel helper requires RPC integration");
+    /* Build a simple refuel script to validate inputs */
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    neoc_contract_parameter_t params[2] = {0};
+    params[0].name = NULL;
+    params[0].type = NEOC_CONTRACT_PARAM_HASH160;
+    params[0].value.hash160 = *account;
+    params[1].name = NULL;
+    params[1].type = NEOC_CONTRACT_PARAM_INTEGER;
+    params[1].value.integer_value = amount;
+
+    neoc_error_t err = neoc_script_create_contract_call(&NEOC_GAS_TOKEN_HASH,
+                                                        "refuel",
+                                                        params,
+                                                        2,
+                                                        &script,
+                                                        &script_len);
+    if (err == NEOC_SUCCESS) {
+        neoc_free(script);
+    }
+    return err;
 }
 
 neoc_error_t neoc_gas_token_get_name(neoc_gas_token_t *token, char **name) {

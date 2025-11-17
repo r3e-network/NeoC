@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include "neoc/neoc_error.h"
 #include "neoc/types/neoc_hash160.h"
+#include "neoc/types/neoc_hash256.h"
+#include "neoc/contract/contract_parameter.h"
 #include "neoc/crypto/ec_key_pair.h"
 
 #ifdef __cplusplus
@@ -184,6 +186,28 @@ neoc_error_t neoc_script_extract_multisig_info(const uint8_t *script,
                                                 uint8_t ***public_keys,
                                                 size_t *key_count,
                                                 uint8_t *min_signatures);
+
+/**
+ * @brief Build a contract call script (InteropSystem.Contract.Call)
+ */
+neoc_error_t neoc_script_create_contract_call(const neoc_hash160_t *contract_hash,
+                                              const char *method,
+                                              const neoc_contract_parameter_t *params,
+                                              size_t param_count,
+                                              uint8_t **script,
+                                              size_t *script_len);
+
+/**
+ * @brief Build a NEP-17 transfer script for a token.
+ */
+neoc_error_t neoc_script_create_nep17_transfer(const neoc_hash160_t *token_hash,
+                                               const neoc_hash160_t *from,
+                                               const neoc_hash160_t *to,
+                                               uint64_t amount,
+                                               const uint8_t *data,
+                                               size_t data_len,
+                                               uint8_t **script,
+                                               size_t *script_len);
 
 #ifdef __cplusplus
 }
