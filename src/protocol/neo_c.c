@@ -132,9 +132,9 @@ neoc_error_t neoc_neo_c_get_network_magic_number(neoc_neo_c_t *neo_c, int *magic
         *magic_out = *neo_c->config->network_magic;
         return NEOC_SUCCESS;
     }
-    
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED,
-                          "Network magic retrieval not implemented");
+
+    *magic_out = NEOC_CONFIG_DEFAULT_NETWORK_MAGIC;
+    return NEOC_SUCCESS;
 }
 
 /**
