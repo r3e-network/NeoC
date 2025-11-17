@@ -148,8 +148,8 @@ neoc_error_t neoc_contract_storage_entry_to_json_swift(
     *json_str = NULL;
     neoc_json_t *root = neoc_json_create_object();
     if (!root) {
-        return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED,
-                              "JSON support not available");
+        return neoc_error_set(NEOC_ERROR_MEMORY,
+                              "Failed to create storage entry JSON");
     }
 
     char *key_hex =
