@@ -61,7 +61,7 @@ void test_base58_encoding_for_valid_strings(void) {
         const char* expected = valid_vectors[i].encoded;
         
         size_t decoded_len = strlen(decoded);
-        
+
         // Calculate required buffer size
         size_t encoded_size = neoc_base58_encode_buffer_size(decoded_len);
         char* encoded = neoc_malloc(encoded_size);
@@ -218,17 +218,26 @@ void test_base58_check_decoding_with_invalid_checksum(void) {
 
 void test_base58_round_trip(void) {
     // Test various byte patterns for round-trip encoding/decoding
-    uint8_t test_patterns[][32] = {
+    uint8_t test_patterns[][38] = {
         {0x00, 0x00, 0x00, 0x00}, // Leading zeros
         {0xFF, 0xFF, 0xFF, 0xFF}, // All ones
         {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0},
         {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09},
         // Pattern that was failing: repeated 0xAB
-        {0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB}
+        {0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB},
+        // WIF payload example (0x80 || 32 * 0x00 || 0x01 || checksum 0x69f436de)
+        {
+            0x80,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x69, 0xF4, 0x36, 0xDE
+        }
     };
-    size_t pattern_sizes[] = {4, 4, 8, 10, 8};
+    size_t pattern_sizes[] = {4, 4, 8, 10, 8, 38};
     
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         // Encode
         size_t encoded_size = neoc_base58_encode_buffer_size(pattern_sizes[i]);
         char* encoded = neoc_malloc(encoded_size);
@@ -246,19 +255,36 @@ void test_base58_round_trip(void) {
         size_t actual_size;
         err = neoc_base58_decode(encoded, decoded, decoded_size, &actual_size);
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
-        
-        // Compare - this might fail for the 0xAB pattern due to known bug
-        if (i == 4) {
-            // Known bug with repeated 0xAB pattern - loses a byte
-            printf("\n  Note: Base58 decode bug with 0xAB pattern - expected %zu, got %zu bytes\n",
-                   pattern_sizes[i], actual_size);
-            if (actual_size != pattern_sizes[i]) {
-                printf("  This is a known issue to be fixed\n");
+
+        char size_message[64];
+        snprintf(size_message, sizeof(size_message),
+                 "pattern %d expected %zu got %zu", i, pattern_sizes[i], actual_size);
+        UNITY_TEST_ASSERT_EQUAL_INT((int)pattern_sizes[i], (int)actual_size,
+                                    __LINE__, size_message);
+
+        if (memcmp(test_patterns[i], decoded, actual_size) != 0) {
+            size_t mismatch_index = 0;
+            while (mismatch_index < actual_size &&
+                   test_patterns[i][mismatch_index] == decoded[mismatch_index]) {
+                mismatch_index++;
             }
-        } else {
-            TEST_ASSERT_EQUAL_INT(pattern_sizes[i], actual_size);
-            TEST_ASSERT_EQUAL_MEMORY(test_patterns[i], decoded, actual_size);
+
+            char diff_message[256];
+            if (mismatch_index < actual_size) {
+                snprintf(diff_message, sizeof(diff_message),
+                         "pattern %d encoded %s byte %zu expected %02X got %02X (size %zu)",
+                         i, encoded, mismatch_index,
+                         test_patterns[i][mismatch_index], decoded[mismatch_index],
+                         actual_size);
+            } else {
+                snprintf(diff_message, sizeof(diff_message),
+                         "pattern %d mismatch after %zu bytes (encoded %s)",
+                         i, actual_size, encoded);
+            }
+            TEST_FAIL_MESSAGE(diff_message);
         }
+
+        TEST_ASSERT_EQUAL_MEMORY(test_patterns[i], decoded, actual_size);
         
         neoc_free(encoded);
         neoc_free(decoded);
@@ -269,9 +295,7 @@ void test_base58_round_trip(void) {
 
 int main(void) {
     UNITY_BEGIN();
-    
-    printf("\n=== BASE58 TESTS ===\n");
-    
+
     RUN_TEST(test_base58_encoding_for_valid_strings);
     RUN_TEST(test_base58_decoding_for_valid_strings);
     RUN_TEST(test_base58_decoding_for_invalid_strings);

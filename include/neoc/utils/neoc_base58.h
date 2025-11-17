@@ -26,7 +26,7 @@ extern "C" {
 /**
  * @brief Base58 alphabet used for encoding
  */
-extern const char NEOC_BASE58_ALPHABET[58];
+extern const char NEOC_BASE58_ALPHABET[];
 
 /**
  * @brief Check if a character is a valid Base58 character

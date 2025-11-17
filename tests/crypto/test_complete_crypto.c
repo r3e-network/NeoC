@@ -257,16 +257,16 @@ int test_ripemd160_empty() {
 int test_base58_encode_decode() {
     uint8_t data[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
     char encoded[256];
-    size_t encoded_len = sizeof(encoded);
     
-    neoc_error_t err = neoc_base58_encode(data, sizeof(data), encoded, &encoded_len);
+    neoc_error_t err = neoc_base58_encode(data, sizeof(data), encoded, sizeof(encoded));
     TEST_ASSERT(err == NEOC_SUCCESS);
+    size_t encoded_len = strlen(encoded);
     TEST_ASSERT(encoded_len > 0);
     
     // Decode back
     uint8_t decoded[256];
-    size_t decoded_len = sizeof(decoded);
-    err = neoc_base58_decode(encoded, decoded, &decoded_len);
+    size_t decoded_len = 0;
+    err = neoc_base58_decode(encoded, decoded, sizeof(decoded), &decoded_len);
     TEST_ASSERT(err == NEOC_SUCCESS);
     TEST_ASSERT(decoded_len == sizeof(data));
     TEST_ASSERT(memcmp(data, decoded, sizeof(data)) == 0);
@@ -278,18 +278,18 @@ int test_base58_check_encode_decode() {
     uint8_t data[] = {0x00, 0x14, 0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96,
                       0xd4, 0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23};
     char encoded[256];
-    size_t encoded_len = sizeof(encoded);
     
-    neoc_error_t err = neoc_base58_check_encode(data, sizeof(data), encoded, &encoded_len);
+    neoc_error_t err = neoc_base58_check_encode(data, sizeof(data), encoded, sizeof(encoded));
     TEST_ASSERT(err == NEOC_SUCCESS);
+    size_t encoded_len = strlen(encoded);
     
     // Should produce Bitcoin address format
     TEST_ASSERT(encoded[0] == '1');
     
     // Decode back
     uint8_t decoded[256];
-    size_t decoded_len = sizeof(decoded);
-    err = neoc_base58_check_decode(encoded, decoded, &decoded_len);
+    size_t decoded_len = 0;
+    err = neoc_base58_check_decode(encoded, decoded, sizeof(decoded), &decoded_len);
     TEST_ASSERT(err == NEOC_SUCCESS);
     TEST_ASSERT(decoded_len == sizeof(data));
     TEST_ASSERT(memcmp(data, decoded, sizeof(data)) == 0);
@@ -301,9 +301,9 @@ int test_base58_invalid_decode() {
     // Invalid characters
     char invalid[] = "InvalidBase58String!@#";
     uint8_t decoded[256];
-    size_t decoded_len = sizeof(decoded);
+    size_t decoded_len = 0;
     
-    neoc_error_t err = neoc_base58_decode(invalid, decoded, &decoded_len);
+    neoc_error_t err = neoc_base58_decode(invalid, decoded, sizeof(decoded), &decoded_len);
     TEST_ASSERT(err != NEOC_SUCCESS);
     
     return TEST_SUCCESS;

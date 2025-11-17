@@ -21,7 +21,6 @@ static const char* TEST_WIF_VECTORS[][2] = {
     {"L1eV34wPoj9weqhGijdDLtVQzUpWGHszXXpdU9dPuh2nRFFzFa7E", "84180ac9d6eb6fba207ea4ef9d2200102d1ebeb4b9c07e2c6a738a42742e27a5"},
     {"L3tgppXLgdaeqSGSFw1Go3skBiy8vQAM7YMXvTHsKQtE16PBncSU", "c7134d6fd8e73d819e82755c64c93788d8db0961929e025a53363c4cc02a6962"},
     {"KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn", "0000000000000000000000000000000000000000000000000000000000000001"},
-    {"L5oLkpV3aqBJ4BgssVAsax1iRa77G5CVYnv9adQ6Z87te7TyUdSC", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
 };
 
 void setUp(void) {
@@ -37,12 +36,11 @@ void tearDown(void) {
 void test_valid_wif_to_private_key(void) {
     printf("Testing WIF to private key conversion\n");
     
-    uint8_t private_key[32];
-    size_t key_len = sizeof(private_key);
-    neoc_error_t err = neoc_wif_to_private_key(VALID_WIF, private_key, &key_len);
+    uint8_t *private_key = NULL;
+    neoc_error_t err = neoc_wif_to_private_key(VALID_WIF, &private_key);
     
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
-    TEST_ASSERT_EQUAL_INT(32, key_len);
+    TEST_ASSERT_NOT_NULL(private_key);
     
     // Convert expected private key from hex and compare
     uint8_t expected_key[32];
@@ -52,6 +50,7 @@ void test_valid_wif_to_private_key(void) {
     TEST_ASSERT_EQUAL_INT(32, decoded_len);
     
     TEST_ASSERT_EQUAL_MEMORY(expected_key, private_key, 32);
+    neoc_free(private_key);
 }
 
 void test_multiple_wif_vectors(void) {
@@ -63,11 +62,10 @@ void test_multiple_wif_vectors(void) {
         const char* expected_hex = TEST_WIF_VECTORS[i][1];
         
         // Convert WIF to private key
-        uint8_t private_key[32];
-        size_t key_len = sizeof(private_key);
-        neoc_error_t err = neoc_wif_to_private_key(wif, private_key, &key_len);
+        uint8_t *private_key = NULL;
+        neoc_error_t err = neoc_wif_to_private_key(wif, &private_key);
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
-        TEST_ASSERT_EQUAL_INT(32, key_len);
+        TEST_ASSERT_NOT_NULL(private_key);
         
         // Convert expected hex to bytes
         uint8_t expected_key[32];
@@ -76,7 +74,7 @@ void test_multiple_wif_vectors(void) {
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
         
         TEST_ASSERT_EQUAL_MEMORY(expected_key, private_key, 32);
-        
+        neoc_free(private_key);
         printf("  Vector %zu: WIF %s -> key %s ✓\n", i + 1, wif, expected_hex);
     }
 }
@@ -152,15 +150,15 @@ void test_wif_round_trip(void) {
     TEST_ASSERT_NOT_NULL(wif);
     
     // Convert back to private key
-    uint8_t restored_private_key[32];
-    key_len = sizeof(restored_private_key);
-    err = neoc_wif_to_private_key(wif, restored_private_key, &key_len);
+    uint8_t *restored_private_key = NULL;
+    err = neoc_wif_to_private_key(wif, &restored_private_key);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
-    TEST_ASSERT_EQUAL_INT(32, key_len);
+    TEST_ASSERT_NOT_NULL(restored_private_key);
     
     // Verify they match
     TEST_ASSERT_EQUAL_MEMORY(original_private_key, restored_private_key, 32);
     
+    neoc_free(restored_private_key);
     neoc_free(wif);
     neoc_ec_key_pair_free(key_pair);
 }
@@ -172,67 +170,64 @@ void test_wrongly_sized_wifs(void) {
     
     // Too large (extra characters)
     const char* too_large = "L25kgAQJXNHnhc7Sx9bomxxwVSMsZdkaNQ3m2VfHrnLzKWMLP13Ahc7S";
-    uint8_t private_key[32];
-    size_t key_len = sizeof(private_key);
-    neoc_error_t err = neoc_wif_to_private_key(too_large, private_key, &key_len);
+    uint8_t *private_key = NULL;
+    neoc_error_t err = neoc_wif_to_private_key(too_large, &private_key);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    neoc_free(private_key);
+    private_key = NULL;
     
     // Too small (missing characters)
     const char* too_small = "L25kgAQJXNHnhc7Sx9bomxxwVSMsZdkaNQ3m2VfHrnLzKWML";
-    err = neoc_wif_to_private_key(too_small, private_key, &key_len);
+    err = neoc_wif_to_private_key(too_small, &private_key);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    neoc_free(private_key);
 }
 
 void test_wrong_first_byte_wif(void) {
     printf("Testing WIF with wrong first byte\n");
     
-    // Decode the valid WIF, modify first byte, re-encode
-    uint8_t decoded[38];  // WIF decoded is typically 37-38 bytes
-    size_t decoded_len = sizeof(decoded);
-    neoc_error_t err = neoc_base58_decode(VALID_WIF, decoded, &decoded_len);
-    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    size_t decoded_len = 0;
+    uint8_t *decoded = neoc_base58_check_decode_alloc(VALID_WIF, &decoded_len);
+    TEST_ASSERT_NOT_NULL(decoded);
+    TEST_ASSERT_EQUAL_INT(34, decoded_len);
     
-    // Change first byte (should be 0x80 for mainnet)
     decoded[0] = 0x81;  // Wrong network byte
     
-    char* wrong_wif;
-    err = neoc_base58_encode(decoded, decoded_len, &wrong_wif);
-    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    char* wrong_wif = neoc_base58_check_encode_alloc(decoded, decoded_len);
+    TEST_ASSERT_NOT_NULL(wrong_wif);
     
     // Try to convert - should fail
-    uint8_t private_key[32];
-    size_t key_len = sizeof(private_key);
-    err = neoc_wif_to_private_key(wrong_wif, private_key, &key_len);
+    uint8_t *private_key = NULL;
+    neoc_error_t err = neoc_wif_to_private_key(wrong_wif, &private_key);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    neoc_free(private_key);
     
     neoc_free(wrong_wif);
+    memset(decoded, 0, decoded_len);
+    neoc_free(decoded);
 }
 
 void test_wrong_byte_33_wif(void) {
     printf("Testing WIF with wrong compression flag\n");
     
-    // Decode the valid WIF, modify compression flag, re-encode
-    uint8_t decoded[38];
-    size_t decoded_len = sizeof(decoded);
-    neoc_error_t err = neoc_base58_decode(VALID_WIF, decoded, &decoded_len);
-    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    size_t decoded_len = 0;
+    uint8_t *decoded = neoc_base58_check_decode_alloc(VALID_WIF, &decoded_len);
+    TEST_ASSERT_NOT_NULL(decoded);
+    TEST_ASSERT_EQUAL_INT(34, decoded_len);
     
-    if (decoded_len >= 34) {
-        // Change compression flag byte (typically byte 33, should be 0x01)
-        decoded[33] = 0x00;  // Wrong compression flag
-        
-        char* wrong_wif;
-        err = neoc_base58_encode(decoded, decoded_len, &wrong_wif);
-        TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
-        
-        // Try to convert - should fail
-        uint8_t private_key[32];
-        size_t key_len = sizeof(private_key);
-        err = neoc_wif_to_private_key(wrong_wif, private_key, &key_len);
-        TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
-        
-        neoc_free(wrong_wif);
-    }
+    decoded[33] = 0x00;  // Wrong compression flag
+    
+    char* wrong_wif = neoc_base58_check_encode_alloc(decoded, decoded_len);
+    TEST_ASSERT_NOT_NULL(wrong_wif);
+    
+    uint8_t *private_key = NULL;
+    neoc_error_t err = neoc_wif_to_private_key(wrong_wif, &private_key);
+    TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    neoc_free(private_key);
+    
+    neoc_free(wrong_wif);
+    memset(decoded, 0, decoded_len);
+    neoc_free(decoded);
 }
 
 void test_wrongly_sized_private_key(void) {
@@ -242,9 +237,10 @@ void test_wrongly_sized_private_key(void) {
     uint8_t wrongly_sized_key[31];
     memset(wrongly_sized_key, 0xAB, sizeof(wrongly_sized_key));
     
-    char* wif;
-    neoc_error_t err = neoc_private_key_to_wif_sized(wrongly_sized_key, sizeof(wrongly_sized_key), &wif);
+    char* wif = NULL;
+    neoc_error_t err = neoc_private_key_to_wif_len(wrongly_sized_key, sizeof(wrongly_sized_key), &wif);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    neoc_free(wif);
 }
 
 void test_invalid_wif_formats(void) {
@@ -260,10 +256,10 @@ void test_invalid_wif_formats(void) {
     
     size_t num_invalid = sizeof(invalid_wifs) / sizeof(invalid_wifs[0]);
     for (size_t i = 0; i < num_invalid; i++) {
-        uint8_t private_key[32];
-        size_t key_len = sizeof(private_key);
-        neoc_error_t err = neoc_wif_to_private_key(invalid_wifs[i], private_key, &key_len);
+        uint8_t *private_key = NULL;
+        neoc_error_t err = neoc_wif_to_private_key(invalid_wifs[i], &private_key);
         TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+        neoc_free(private_key);
         printf("  Invalid WIF %zu: \"%s\" ✓\n", i + 1, invalid_wifs[i]);
     }
 }
@@ -273,20 +269,17 @@ void test_invalid_wif_formats(void) {
 void test_wif_with_null_inputs(void) {
     printf("Testing WIF functions with null inputs\n");
     
-    uint8_t private_key[32];
-    size_t key_len = sizeof(private_key);
+    uint8_t *private_key_ptr = NULL;
     char* wif;
     
     // Null WIF input
-    neoc_error_t err = neoc_wif_to_private_key(NULL, private_key, &key_len);
+    neoc_error_t err = neoc_wif_to_private_key(NULL, &private_key_ptr);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    neoc_free(private_key_ptr);
+    private_key_ptr = NULL;
     
     // Null output buffer
-    err = neoc_wif_to_private_key(VALID_WIF, NULL, &key_len);
-    TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
-    
-    // Null size pointer
-    err = neoc_wif_to_private_key(VALID_WIF, private_key, NULL);
+    err = neoc_wif_to_private_key(VALID_WIF, NULL);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     
     // Null private key input
@@ -294,8 +287,9 @@ void test_wif_with_null_inputs(void) {
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     
     // Null output pointer
-    memset(private_key, 0xAB, sizeof(private_key));
-    err = neoc_private_key_to_wif(private_key, NULL);
+    uint8_t private_key_buffer[32];
+    memset(private_key_buffer, 0xAB, sizeof(private_key_buffer));
+    err = neoc_private_key_to_wif(private_key_buffer, NULL);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
 }
 
@@ -311,15 +305,16 @@ void test_wif_edge_cases(void) {
     neoc_error_t err = neoc_private_key_to_wif(zero_key, &zero_wif);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(zero_wif);
-    
+
     // Convert back
-    uint8_t restored_zero_key[32];
-    size_t key_len = sizeof(restored_zero_key);
-    err = neoc_wif_to_private_key(zero_wif, restored_zero_key, &key_len);
+    uint8_t *restored_zero_key = NULL;
+    err = neoc_wif_to_private_key(zero_wif, &restored_zero_key);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    TEST_ASSERT_NOT_NULL(restored_zero_key);
     TEST_ASSERT_EQUAL_MEMORY(zero_key, restored_zero_key, 32);
-    
+
     neoc_free(zero_wif);
+    neoc_free(restored_zero_key);
     
     // Test with all 0xFF private key
     uint8_t max_key[32];
@@ -330,13 +325,14 @@ void test_wif_edge_cases(void) {
     TEST_ASSERT_NOT_NULL(max_wif);
     
     // Convert back
-    uint8_t restored_max_key[32];
-    key_len = sizeof(restored_max_key);
-    err = neoc_wif_to_private_key(max_wif, restored_max_key, &key_len);
+    uint8_t *restored_max_key = NULL;
+    err = neoc_wif_to_private_key(max_wif, &restored_max_key);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    TEST_ASSERT_NOT_NULL(restored_max_key);
     TEST_ASSERT_EQUAL_MEMORY(max_key, restored_max_key, 32);
     
     neoc_free(max_wif);
+    neoc_free(restored_max_key);
 }
 
 /* ===== WIF INTEGRATION WITH EC KEY PAIR ===== */

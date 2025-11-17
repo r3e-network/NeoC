@@ -32,9 +32,10 @@ static void test_valid_wif_to_private_key(void) {
     printf("Testing valid WIF to private key conversion...\n");
     
     // Convert WIF to private key
-    uint8_t private_key[32];
-    neoc_error_t err = neoc_wif_to_private_key(VALID_WIF, private_key);
+    uint8_t *private_key = NULL;
+    neoc_error_t err = neoc_wif_to_private_key(VALID_WIF, &private_key);
     assert(err == NEOC_SUCCESS);
+    assert(private_key != NULL);
     
     // Convert result to hex for comparison
     char hex_output[65];
@@ -44,6 +45,7 @@ static void test_valid_wif_to_private_key(void) {
     // Compare with expected private key
     assert(strcasecmp(hex_output, PRIVATE_KEY_HEX) == 0);
     
+    neoc_free(private_key);
     printf("  ✅ Valid WIF to private key test passed\n");
 }
 
@@ -53,14 +55,17 @@ static void test_wrongly_sized_wifs(void) {
     
     // Test WIF that is too large
     const char *too_large = "L25kgAQJXNHnhc7Sx9bomxxwVSMsZdkaNQ3m2VfHrnLzKWMLP13Ahc7S";
-    uint8_t private_key[32];
-    neoc_error_t err = neoc_wif_to_private_key(too_large, private_key);
+    uint8_t *private_key = NULL;
+    neoc_error_t err = neoc_wif_to_private_key(too_large, &private_key);
     assert(err != NEOC_SUCCESS);
+    neoc_free(private_key);
     
     // Test WIF that is too small
     const char *too_small = "L25kgAQJXNHnhc7Sx9bomxxwVSMsZdkaNQ3m2VfHrnLzKWML";
-    err = neoc_wif_to_private_key(too_small, private_key);
+    private_key = NULL;
+    err = neoc_wif_to_private_key(too_small, &private_key);
     assert(err != NEOC_SUCCESS);
+    neoc_free(private_key);
     
     printf("  ✅ Wrongly sized WIFs test passed\n");
 }
@@ -71,8 +76,8 @@ static void test_wrong_first_byte_wif(void) {
     
     // Decode the valid WIF
     uint8_t decoded[38];
-    size_t decoded_len = sizeof(decoded);
-    neoc_error_t err = neoc_base58_decode(VALID_WIF, decoded, &decoded_len);
+    size_t decoded_len = 0;
+    neoc_error_t err = neoc_base58_decode(VALID_WIF, decoded, sizeof(decoded), &decoded_len);
     assert(err == NEOC_SUCCESS);
     
     // Change the first byte (should be 0x80)
@@ -84,9 +89,10 @@ static void test_wrong_first_byte_wif(void) {
     assert(err == NEOC_SUCCESS);
     
     // Try to convert to private key - should fail
-    uint8_t private_key[32];
-    err = neoc_wif_to_private_key(wrong_first_byte_wif, private_key);
+    uint8_t *private_key = NULL;
+    err = neoc_wif_to_private_key(wrong_first_byte_wif, &private_key);
     assert(err != NEOC_SUCCESS);
+    neoc_free(private_key);
     
     printf("  ✅ Wrong first byte WIF test passed\n");
 }
@@ -97,8 +103,8 @@ static void test_wrong_byte_33_wif(void) {
     
     // Decode the valid WIF
     uint8_t decoded[38];
-    size_t decoded_len = sizeof(decoded);
-    neoc_error_t err = neoc_base58_decode(VALID_WIF, decoded, &decoded_len);
+    size_t decoded_len = 0;
+    neoc_error_t err = neoc_base58_decode(VALID_WIF, decoded, sizeof(decoded), &decoded_len);
     assert(err == NEOC_SUCCESS);
     assert(decoded_len == 38); // 1 (version) + 32 (key) + 1 (flag) + 4 (checksum)
     
@@ -111,9 +117,10 @@ static void test_wrong_byte_33_wif(void) {
     assert(err == NEOC_SUCCESS);
     
     // Try to convert to private key - should fail
-    uint8_t private_key[32];
-    err = neoc_wif_to_private_key(wrong_byte_33_wif, private_key);
+    uint8_t *private_key = NULL;
+    err = neoc_wif_to_private_key(wrong_byte_33_wif, &private_key);
     assert(err != NEOC_SUCCESS);
+    neoc_free(private_key);
     
     printf("  ✅ Wrong byte 33 WIF test passed\n");
 }
@@ -148,15 +155,18 @@ static void test_wrongly_sized_private_key(void) {
     
     // Create a wrongly sized private key (31 bytes instead of 32)
     const char *wrong_sized_hex = "9117f4bf9be717c9a90994326897f4243503accd06712162267e77f18b49c3";
-    uint8_t wrong_sized_key[31];
+    uint8_t decoded_key[31];
     size_t wrong_sized_len = 0;
-    neoc_error_t err = neoc_hex_decode(wrong_sized_hex, wrong_sized_key, sizeof(wrong_sized_key), &wrong_sized_len);
+    neoc_error_t err = neoc_hex_decode(wrong_sized_hex, decoded_key, sizeof(decoded_key), &wrong_sized_len);
     assert(err == NEOC_SUCCESS);
     assert(wrong_sized_len == 31);
     
-    // Try to convert to WIF - should fail because we're passing wrong size
+    uint8_t wrong_sized_key[32] = {0};
+    memcpy(wrong_sized_key, decoded_key, wrong_sized_len);
+    
+    // Attempt conversion (expected to fail because the input was derived from a 31 byte key)
     char *wif = NULL;
-    err = neoc_private_key_to_wif_with_size(wrong_sized_key, wrong_sized_len, &wif);
+    err = neoc_private_key_to_wif(wrong_sized_key, &wif);
     assert(err != NEOC_SUCCESS);
     assert(wif == NULL);
     

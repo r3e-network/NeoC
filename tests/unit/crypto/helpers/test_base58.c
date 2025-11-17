@@ -100,8 +100,8 @@ static void test_base58_decoding_for_valid_strings(void) {
         
         // Decode from Base58
         uint8_t decoded[256];
-        size_t decoded_len = sizeof(decoded);
-        neoc_error_t err = neoc_base58_decode(input, decoded, &decoded_len);
+        size_t decoded_len = 0;
+        neoc_error_t err = neoc_base58_decode(input, decoded, sizeof(decoded), &decoded_len);
         assert(err == NEOC_SUCCESS);
         
         // Convert bytes to string for comparison
@@ -131,8 +131,8 @@ static void test_base58_decoding_for_invalid_strings(void) {
         
         // Try to decode - should fail
         uint8_t decoded[256];
-        size_t decoded_len = sizeof(decoded);
-        neoc_error_t err = neoc_base58_decode(invalid, decoded, &decoded_len);
+        size_t decoded_len = 0;
+        neoc_error_t err = neoc_base58_decode(invalid, decoded, sizeof(decoded), &decoded_len);
         assert(err != NEOC_SUCCESS);
         
         printf("  ✅ Correctly rejected invalid string: '%s'\n", invalid);
@@ -180,8 +180,8 @@ static void test_base58_check_decoding(void) {
     
     // Decode with checksum verification
     uint8_t decoded[128];
-    size_t decoded_len = sizeof(decoded);
-    neoc_error_t err = neoc_base58_check_decode(input, decoded, &decoded_len);
+    size_t decoded_len = 0;
+    neoc_error_t err = neoc_base58_check_decode(input, decoded, sizeof(decoded), &decoded_len);
     assert(err == NEOC_SUCCESS);
     assert(decoded_len == expected_len);
     
@@ -199,8 +199,8 @@ static void test_base58_check_decoding_with_invalid_characters(void) {
     
     // Try to decode - should fail
     uint8_t decoded[128];
-    size_t decoded_len = sizeof(decoded);
-    neoc_error_t err = neoc_base58_check_decode(invalid, decoded, &decoded_len);
+    size_t decoded_len = 0;
+    neoc_error_t err = neoc_base58_check_decode(invalid, decoded, sizeof(decoded), &decoded_len);
     assert(err != NEOC_SUCCESS);
     
     printf("  ✅ Base58 check decoding with invalid characters test passed\n");
@@ -215,8 +215,8 @@ static void test_base58_check_decoding_with_invalid_checksum(void) {
     
     // Try to decode - should fail due to checksum mismatch
     uint8_t decoded[128];
-    size_t decoded_len = sizeof(decoded);
-    neoc_error_t err = neoc_base58_check_decode(invalid_checksum, decoded, &decoded_len);
+    size_t decoded_len = 0;
+    neoc_error_t err = neoc_base58_check_decode(invalid_checksum, decoded, sizeof(decoded), &decoded_len);
     assert(err != NEOC_SUCCESS);
     
     printf("  ✅ Base58 check decoding with invalid checksum test passed\n");
