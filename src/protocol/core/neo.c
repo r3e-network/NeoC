@@ -21,6 +21,7 @@
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/types/neoc_hash256.h"
 #include "neoc/transaction/witness_scope.h"
+#include "neoc/witnessrule/witness_rule.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -317,10 +318,6 @@ static neoc_error_t neoc_signer_to_cjson(const neoc_signer_t *signer, cJSON **ou
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid signer reference");
     }
 
-    if (signer->rules && signer->rules_count > 0) {
-        return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Witness rules not yet supported in JSON conversion");
-    }
-
     cJSON *obj = cJSON_CreateObject();
     if (!obj) {
         return neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "Failed to allocate signer JSON");
@@ -384,6 +381,32 @@ static neoc_error_t neoc_signer_to_cjson(const neoc_signer_t *signer, cJSON **ou
             return neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "Failed to encode combined signer scopes");
         }
         neoc_free(combined);
+    }
+
+    if (signer->rules && signer->rules_count > 0) {
+        cJSON *rules_array = cJSON_CreateArray();
+        if (!rules_array) {
+            cJSON_Delete(obj);
+            return neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "Failed to allocate signer rules");
+        }
+        for (size_t i = 0; i < signer->rules_count; i++) {
+            char *rule_json = NULL;
+            neoc_error_t rerr = neoc_witness_rule_to_json(signer->rules[i], &rule_json);
+            if (rerr != NEOC_SUCCESS) {
+                cJSON_Delete(rules_array);
+                cJSON_Delete(obj);
+                return rerr;
+            }
+            cJSON *rule_obj = cJSON_Parse(rule_json);
+            neoc_free(rule_json);
+            if (!rule_obj) {
+                cJSON_Delete(rules_array);
+                cJSON_Delete(obj);
+                return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Failed to parse rule JSON");
+            }
+            cJSON_AddItemToArray(rules_array, rule_obj);
+        }
+        cJSON_AddItemToObject(obj, "rules", rules_array);
     }
 
     if (signer->allowed_contracts && signer->allowed_contracts_count > 0) {
