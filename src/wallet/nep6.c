@@ -1,3 +1,5 @@
+#define NEOC_NEP6_DISABLE_OVERLOADS
+
 #ifdef HAVE_CJSON
 #include <cjson/cJSON.h>
 #endif
@@ -15,25 +17,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-// NEP-6 account structure
-struct neoc_nep6_account_t {
-    char *address;
-    char *label;
-    bool is_default;
-    bool lock;
-    char *key;  // NEP-2 encrypted key
-    neoc_nep6_contract_t *contract;
-    void *extra;  // Extra data
-};
-
-// NEP-6 contract structure
-struct neoc_nep6_contract_t {
-    char *script;
-    neoc_nep6_parameter_t *parameters;
-    size_t parameter_count;
-    bool is_deployed;
-};
 
 // NEP-6 wallet structure
 struct neoc_nep6_wallet_t {
@@ -133,75 +116,201 @@ neoc_error_t neoc_nep6_wallet_add_account(neoc_nep6_wallet_t *wallet,
         return err;
     }
     
-    // Create account
-    neoc_nep6_account_t *account = neoc_calloc(1, sizeof(neoc_nep6_account_t));
-    if (!account) {
+    neoc_nep6_account_t *account = NULL;
+    neoc_error_t create_err = neoc_nep6_account_create(address,
+                                                       label,
+                                                       is_default,
+                                                       false,
+                                                       encrypted_key,
+                                                       NULL,
+                                                       &account);
+    if (create_err != NEOC_SUCCESS) {
         neoc_ec_key_pair_free(key_pair);
-        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate account");
+        return create_err;
     }
     
-    account->address = str_dup(address);
-    account->label = str_dup(label);
-    account->is_default = is_default;
-    account->lock = false;
-    account->key = str_dup(encrypted_key);
-    
     // Create default contract (single signature)
-    account->contract = neoc_calloc(1, sizeof(neoc_nep6_contract_t));
-    if (account->contract) {
-        // Get public key
-        uint8_t public_key[65];
-        size_t public_key_len = sizeof(public_key);
-        neoc_ec_key_pair_get_public_key(key_pair, public_key, &public_key_len);
-        
-        // Create verification script (simplified)
-        uint8_t script[35];
-        script[0] = 0x21; // PUSH21
-        memcpy(script + 1, public_key, 33);
-        script[34] = 0xAC; // CHECKSIG
-        
-        // Convert to hex
-        char hex_script[71];
-        for (int i = 0; i < 35; i++) {
-            sprintf(hex_script + i * 2, "%02x", script[i]);
-        }
-        account->contract->script = str_dup(hex_script);
-        
-        // Set parameter
-        account->contract->parameter_count = 1;
-        account->contract->parameters = neoc_malloc(sizeof(neoc_nep6_parameter_t));
-        if (account->contract->parameters) {
-            account->contract->parameters[0].name = str_dup("signature");
-            account->contract->parameters[0].type = NEOC_PARAM_TYPE_SIGNATURE;
-        }
-        account->contract->is_deployed = false;
+    // Get public key
+    uint8_t public_key[65];
+    size_t public_key_len = sizeof(public_key);
+    neoc_ec_key_pair_get_public_key(key_pair, public_key, &public_key_len);
+    
+    // Create verification script (simplified)
+    uint8_t script[35];
+    script[0] = 0x21; // PUSH21
+    memcpy(script + 1, public_key, 33);
+    script[34] = 0xAC; // CHECKSIG
+    
+    // Convert to hex
+    char hex_script[71];
+    for (int i = 0; i < 35; i++) {
+        sprintf(hex_script + i * 2, "%02x", script[i]);
+    }
+
+    neoc_nep6_contract_t *contract = NULL;
+    neoc_nep6_parameter_t contract_param = {
+        .name = "signature",
+        .type = NEOC_PARAM_TYPE_SIGNATURE
+    };
+    neoc_error_t contract_err = neoc_nep6_contract_create(hex_script,
+                                                          &contract_param,
+                                                          1,
+                                                          false,
+                                                          &contract);
+    if (contract_err == NEOC_SUCCESS) {
+        (void)neoc_nep6_account_set_contract(account, contract);
+    } else {
+        neoc_nep6_account_free(account);
+        neoc_ec_key_pair_free(key_pair);
+        return contract_err;
     }
     
     neoc_ec_key_pair_free(key_pair);
     
-    // Add to wallet
+    neoc_error_t add_err = neoc_nep6_wallet_add_account_existing(wallet, account);
+    if (add_err != NEOC_SUCCESS) {
+        neoc_nep6_account_free(account);
+        return add_err;
+    }
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_nep6_wallet_add_account_existing(neoc_nep6_wallet_t *wallet,
+                                                   neoc_nep6_account_t *account) {
+    if (!wallet || !account) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_add_account: invalid arguments");
+    }
+
+    const char *address = neoc_nep6_account_get_address(account);
+    if (!address) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_add_account: account missing address");
+    }
+
+    for (size_t i = 0; i < wallet->account_count; ++i) {
+        const char *existing_address = neoc_nep6_account_get_address(wallet->accounts[i]);
+        if (existing_address && strcmp(existing_address, address) == 0) {
+            return neoc_error_set(NEOC_ERROR_INVALID_STATE, "wallet_add_account: account already present");
+        }
+    }
+
     if (wallet->account_count >= wallet->account_capacity) {
-        // Resize array
-        size_t new_capacity = wallet->account_capacity * 2;
+        size_t new_capacity = wallet->account_capacity ? wallet->account_capacity * 2 : 4;
         neoc_nep6_account_t **new_accounts = neoc_realloc(wallet->accounts,
-                                                           new_capacity * sizeof(neoc_nep6_account_t*));
+                                                           new_capacity * sizeof(neoc_nep6_account_t *));
         if (!new_accounts) {
-            neoc_nep6_account_free(account);
-            return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to resize accounts");
+            return neoc_error_set(NEOC_ERROR_MEMORY, "wallet_add_account: resize failed");
         }
         wallet->accounts = new_accounts;
         wallet->account_capacity = new_capacity;
     }
-    
-    // If this is the default account, clear default flag on others
-    if (is_default) {
-        for (size_t i = 0; i < wallet->account_count; i++) {
-            wallet->accounts[i]->is_default = false;
+
+    if (neoc_nep6_account_is_default(account)) {
+        for (size_t i = 0; i < wallet->account_count; ++i) {
+            (void)neoc_nep6_account_set_default(wallet->accounts[i], false);
         }
     }
-    
+
     wallet->accounts[wallet->account_count++] = account;
-    
+    return NEOC_SUCCESS;
+}
+
+const char* neoc_nep6_wallet_get_name_ptr(const neoc_nep6_wallet_t *wallet) {
+    return wallet ? wallet->name : NULL;
+}
+
+neoc_error_t neoc_nep6_wallet_get_name_copy(const neoc_nep6_wallet_t *wallet, char **name_out) {
+    if (!name_out) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_get_name: invalid output");
+    }
+    if (!wallet || !wallet->name) {
+        *name_out = NULL;
+        return wallet ? NEOC_SUCCESS : neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_get_name: invalid wallet");
+    }
+    *name_out = neoc_strdup(wallet->name);
+    if (!*name_out) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "wallet_get_name: allocation failed");
+    }
+    return NEOC_SUCCESS;
+}
+
+const char* neoc_nep6_wallet_get_version_ptr(const neoc_nep6_wallet_t *wallet) {
+    return wallet ? wallet->version : NULL;
+}
+
+neoc_error_t neoc_nep6_wallet_get_version_copy(const neoc_nep6_wallet_t *wallet, char **version_out) {
+    if (!version_out) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_get_version: invalid output");
+    }
+    if (!wallet || !wallet->version) {
+        *version_out = NULL;
+        return wallet ? NEOC_SUCCESS : neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_get_version: invalid wallet");
+    }
+    *version_out = neoc_strdup(wallet->version);
+    if (!*version_out) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "wallet_get_version: allocation failed");
+    }
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_nep6_wallet_set_version(neoc_nep6_wallet_t *wallet,
+                                           const char *version) {
+    if (!wallet) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_set_version: invalid wallet");
+    }
+    if (wallet->version) {
+        neoc_free(wallet->version);
+        wallet->version = NULL;
+    }
+    if (version) {
+        wallet->version = neoc_strdup(version);
+        if (!wallet->version) {
+            return neoc_error_set(NEOC_ERROR_MEMORY, "wallet_set_version: allocation failed");
+        }
+    }
+    return NEOC_SUCCESS;
+}
+
+const neoc_nep6_scrypt_params_t* neoc_nep6_wallet_get_scrypt_raw(const neoc_nep6_wallet_t *wallet) {
+    return wallet ? &wallet->scrypt : NULL;
+}
+
+neoc_scrypt_params_t* neoc_nep6_wallet_get_scrypt_copy(const neoc_nep6_wallet_t *wallet) {
+    if (!wallet) {
+        return NULL;
+    }
+    neoc_scrypt_params_t *params = neoc_calloc(1, sizeof(neoc_scrypt_params_t));
+    if (!params) {
+        return NULL;
+    }
+    params->n = wallet->scrypt.n;
+    params->r = wallet->scrypt.r;
+    params->p = wallet->scrypt.p;
+    params->dk_len = 64;
+    return params;
+}
+
+neoc_error_t neoc_nep6_wallet_get_scrypt_out(const neoc_nep6_wallet_t *wallet,
+                                             neoc_scrypt_params_t *params_out) {
+    if (!wallet || !params_out) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_get_scrypt: invalid arguments");
+    }
+    params_out->n = wallet->scrypt.n;
+    params_out->r = wallet->scrypt.r;
+    params_out->p = wallet->scrypt.p;
+    if (params_out->dk_len == 0) {
+        params_out->dk_len = 64;
+    }
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_nep6_wallet_set_scrypt(neoc_nep6_wallet_t *wallet,
+                                          const neoc_scrypt_params_t *params) {
+    if (!wallet || !params) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "wallet_set_scrypt: invalid arguments");
+    }
+    wallet->scrypt.n = params->n;
+    wallet->scrypt.r = params->r;
+    wallet->scrypt.p = params->p;
     return NEOC_SUCCESS;
 }
 
@@ -229,62 +338,73 @@ neoc_error_t neoc_nep6_wallet_remove_account(neoc_nep6_wallet_t *wallet,
     return neoc_error_set(NEOC_ERROR_NOT_FOUND, "Account not found");
 }
 
-neoc_error_t neoc_nep6_wallet_get_account(const neoc_nep6_wallet_t *wallet,
-                                           const char *address,
-                                           neoc_nep6_account_t **account) {
-    if (!wallet || !address || !account) {
-        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+neoc_nep6_account_t* neoc_nep6_wallet_get_account_by_address(const neoc_nep6_wallet_t *wallet,
+                                                              const char *address) {
+    if (!wallet || !address) {
+        return NULL;
     }
-    
+
     for (size_t i = 0; i < wallet->account_count; i++) {
-        if (strcmp(wallet->accounts[i]->address, address) == 0) {
-            *account = wallet->accounts[i];
-            return NEOC_SUCCESS;
+        const char *current_address = neoc_nep6_account_get_address(wallet->accounts[i]);
+        if (current_address && strcmp(current_address, address) == 0) {
+            return wallet->accounts[i];
         }
     }
-    
-    return neoc_error_set(NEOC_ERROR_NOT_FOUND, "Account not found");
+
+    return NULL;
 }
 
-neoc_error_t neoc_nep6_wallet_get_default_account(const neoc_nep6_wallet_t *wallet,
-                                                   neoc_nep6_account_t **account) {
-    if (!wallet || !account) {
-        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+neoc_nep6_account_t* neoc_nep6_wallet_find_account_by_address(const neoc_nep6_wallet_t *wallet,
+                                                               const char *address) {
+    return neoc_nep6_wallet_get_account_by_address(wallet, address);
+}
+
+neoc_nep6_account_t* neoc_nep6_wallet_get_default_account_ptr(const neoc_nep6_wallet_t *wallet) {
+    if (!wallet) {
+        return NULL;
     }
-    
+
     for (size_t i = 0; i < wallet->account_count; i++) {
-        if (wallet->accounts[i]->is_default) {
-            *account = wallet->accounts[i];
-            return NEOC_SUCCESS;
+        if (neoc_nep6_account_is_default(wallet->accounts[i])) {
+            return wallet->accounts[i];
         }
     }
-    
-    // If no default, return first account
-    if (wallet->account_count > 0) {
-        *account = wallet->accounts[0];
-        return NEOC_SUCCESS;
-    }
-    
-    return neoc_error_set(NEOC_ERROR_NOT_FOUND, "No accounts in wallet");
+
+    return wallet->account_count > 0 ? wallet->accounts[0] : NULL;
 }
 
-size_t neoc_nep6_wallet_get_account_count(const neoc_nep6_wallet_t *wallet) {
+neoc_error_t neoc_nep6_wallet_get_default_account_out(const neoc_nep6_wallet_t *wallet,
+                                                       neoc_nep6_account_t **account) {
+    if (!account) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid account pointer");
+    }
+    neoc_nep6_account_t *result = neoc_nep6_wallet_get_default_account_ptr(wallet);
+    if (!result) {
+        return neoc_error_set(NEOC_ERROR_NOT_FOUND, "No accounts in wallet");
+    }
+    *account = result;
+    return NEOC_SUCCESS;
+}
+
+size_t neoc_nep6_wallet_get_account_count_value(const neoc_nep6_wallet_t *wallet) {
     return wallet ? wallet->account_count : 0;
 }
 
-neoc_error_t neoc_nep6_wallet_get_account_by_index(const neoc_nep6_wallet_t *wallet,
-                                                    size_t index,
-                                                    neoc_nep6_account_t **account) {
-    if (!wallet || !account) {
-        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+neoc_error_t neoc_nep6_wallet_get_account_count_out(const neoc_nep6_wallet_t *wallet,
+                                                     size_t *count_out) {
+    if (!count_out) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid count pointer");
     }
-    
-    if (index >= wallet->account_count) {
-        return neoc_error_set(NEOC_ERROR_OUT_OF_BOUNDS, "Index out of bounds");
-    }
-    
-    *account = wallet->accounts[index];
+    *count_out = neoc_nep6_wallet_get_account_count_value(wallet);
     return NEOC_SUCCESS;
+}
+
+neoc_nep6_account_t* neoc_nep6_wallet_get_account_by_index(const neoc_nep6_wallet_t *wallet,
+                                                            size_t index) {
+    if (!wallet || index >= wallet->account_count) {
+        return NULL;
+    }
+    return wallet->accounts[index];
 }
 
 neoc_error_t neoc_nep6_account_decrypt_private_key(const neoc_nep6_account_t *account,
@@ -305,40 +425,6 @@ neoc_error_t neoc_nep6_account_decrypt_private_key(const neoc_nep6_account_t *ac
     
     // Decrypt using NEP-2
     return neoc_nep2_decrypt(account->key, password, NULL, private_key, private_key_len);
-}
-
-const char* neoc_nep6_account_get_address(const neoc_nep6_account_t *account) {
-    return account ? account->address : NULL;
-}
-
-const char* neoc_nep6_account_get_label(const neoc_nep6_account_t *account) {
-    return account ? account->label : NULL;
-}
-
-bool neoc_nep6_account_is_default(const neoc_nep6_account_t *account) {
-    return account ? account->is_default : false;
-}
-
-void neoc_nep6_account_free(neoc_nep6_account_t *account) {
-    if (!account) return;
-    
-    neoc_free(account->address);
-    neoc_free(account->label);
-    neoc_free(account->key);
-    
-    if (account->contract) {
-        neoc_free(account->contract->script);
-        if (account->contract->parameters) {
-            for (size_t i = 0; i < account->contract->parameter_count; i++) {
-                neoc_free(account->contract->parameters[i].name);
-            }
-            neoc_free(account->contract->parameters);
-        }
-        neoc_free(account->contract);
-    }
-    
-    neoc_free(account->extra);
-    neoc_free(account);
 }
 
 void neoc_nep6_wallet_free(neoc_nep6_wallet_t *wallet) {

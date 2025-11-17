@@ -13,6 +13,7 @@
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/wallet/nep6/nep6_account.h"
 #include "neoc/wallet/nep6/nep6_contract.h"
+#include "neoc/crypto/scrypt_params.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +21,14 @@ extern "C" {
 
 // Forward declarations
 typedef struct neoc_nep6_wallet_t neoc_nep6_wallet_t;
+
+#ifndef NEOC_PP_OVERLOAD
+#define NEOC_PP_CONCAT(a,b) NEOC_PP_CONCAT_IMPL(a,b)
+#define NEOC_PP_CONCAT_IMPL(a,b) a##b
+#define NEOC_PP_NARGS_IMPL(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,N,...) N
+#define NEOC_PP_NARGS(...) NEOC_PP_NARGS_IMPL(__VA_ARGS__,10,9,8,7,6,5,4,3,2,1,0)
+#define NEOC_PP_OVERLOAD(prefix, ...) NEOC_PP_CONCAT(prefix, NEOC_PP_NARGS(__VA_ARGS__))(__VA_ARGS__)
+#endif
 
 /**
  * @brief NEP-6 wallet scrypt parameters
@@ -117,6 +126,8 @@ neoc_error_t neoc_nep6_wallet_add_account(neoc_nep6_wallet_t *wallet,
                                            const char *password,
                                            const char *label,
                                            bool is_default);
+neoc_error_t neoc_nep6_wallet_add_account_existing(neoc_nep6_wallet_t *wallet,
+                                                   neoc_nep6_account_t *account);
 
 /**
  * @brief Remove an account from a NEP-6 wallet
@@ -136,9 +147,10 @@ neoc_error_t neoc_nep6_wallet_remove_account(neoc_nep6_wallet_t *wallet,
  * @param account Output account handle
  * @return NEOC_SUCCESS on success, error code otherwise
  */
-neoc_error_t neoc_nep6_wallet_get_account(const neoc_nep6_wallet_t *wallet,
-                                           const char *address,
-                                           neoc_nep6_account_t **account);
+neoc_nep6_account_t* neoc_nep6_wallet_get_account_by_address(const neoc_nep6_wallet_t *wallet,
+                                                              const char *address);
+neoc_nep6_account_t* neoc_nep6_wallet_find_account_by_address(const neoc_nep6_wallet_t *wallet,
+                                                               const char *address);
 
 /**
  * @brief Get default account
@@ -147,8 +159,9 @@ neoc_error_t neoc_nep6_wallet_get_account(const neoc_nep6_wallet_t *wallet,
  * @param account Output account handle
  * @return NEOC_SUCCESS on success, error code otherwise
  */
-neoc_error_t neoc_nep6_wallet_get_default_account(const neoc_nep6_wallet_t *wallet,
-                                                   neoc_nep6_account_t **account);
+neoc_error_t neoc_nep6_wallet_get_default_account_out(const neoc_nep6_wallet_t *wallet,
+                                                       neoc_nep6_account_t **account);
+neoc_nep6_account_t* neoc_nep6_wallet_get_default_account_ptr(const neoc_nep6_wallet_t *wallet);
 
 /**
  * @brief Get number of accounts in wallet
@@ -156,19 +169,17 @@ neoc_error_t neoc_nep6_wallet_get_default_account(const neoc_nep6_wallet_t *wall
  * @param wallet Wallet handle
  * @return Number of accounts
  */
-size_t neoc_nep6_wallet_get_account_count(const neoc_nep6_wallet_t *wallet);
+size_t neoc_nep6_wallet_get_account_count_value(const neoc_nep6_wallet_t *wallet);
 
 /**
  * @brief Get account by index
  * 
  * @param wallet Wallet handle
  * @param index Account index
- * @param account Output account handle
- * @return NEOC_SUCCESS on success, error code otherwise
+ * @return Account pointer or NULL
  */
-neoc_error_t neoc_nep6_wallet_get_account_by_index(const neoc_nep6_wallet_t *wallet,
-                                                    size_t index,
-                                                    neoc_nep6_account_t **account);
+neoc_nep6_account_t* neoc_nep6_wallet_get_account_by_index(const neoc_nep6_wallet_t *wallet,
+                                                            size_t index);
 
 /**
  * @brief Decrypt account private key
@@ -221,6 +232,60 @@ void neoc_nep6_wallet_free(neoc_nep6_wallet_t *wallet);
  * @param account Account handle
  */
 void neoc_nep6_account_free(neoc_nep6_account_t *account);
+
+neoc_error_t neoc_nep6_wallet_set_version(neoc_nep6_wallet_t *wallet,
+                                           const char *version);
+
+const neoc_nep6_scrypt_params_t* neoc_nep6_wallet_get_scrypt_raw(const neoc_nep6_wallet_t *wallet);
+neoc_scrypt_params_t* neoc_nep6_wallet_get_scrypt_copy(const neoc_nep6_wallet_t *wallet);
+neoc_error_t neoc_nep6_wallet_get_scrypt_out(const neoc_nep6_wallet_t *wallet,
+                                             neoc_scrypt_params_t *params_out);
+neoc_error_t neoc_nep6_wallet_set_scrypt(neoc_nep6_wallet_t *wallet,
+                                          const neoc_scrypt_params_t *params);
+
+const char* neoc_nep6_wallet_get_name_ptr(const neoc_nep6_wallet_t *wallet);
+neoc_error_t neoc_nep6_wallet_get_name_copy(const neoc_nep6_wallet_t *wallet, char **name_out);
+const char* neoc_nep6_wallet_get_version_ptr(const neoc_nep6_wallet_t *wallet);
+neoc_error_t neoc_nep6_wallet_get_version_copy(const neoc_nep6_wallet_t *wallet, char **version_out);
+neoc_error_t neoc_nep6_wallet_get_account_count_out(const neoc_nep6_wallet_t *wallet, size_t *count_out);
+
+#ifndef NEOC_NEP6_DISABLE_OVERLOADS
+#define NEOC_NEP6_WALLET_ADD_ACCOUNT_2(wallet, account) \
+    neoc_nep6_wallet_add_account_existing(wallet, account)
+#define NEOC_NEP6_WALLET_ADD_ACCOUNT_5(wallet, private_key, password, label, is_default) \
+    neoc_nep6_wallet_add_account(wallet, private_key, password, label, is_default)
+#define neoc_nep6_wallet_add_account(...) \
+    NEOC_PP_OVERLOAD(NEOC_NEP6_WALLET_ADD_ACCOUNT_, __VA_ARGS__)
+
+#define neoc_nep6_wallet_get_name(...) NEOC_PP_OVERLOAD(NEOC_NEP6_WALLET_GET_NAME_, __VA_ARGS__)
+#define NEOC_NEP6_WALLET_GET_NAME_1(wallet) neoc_nep6_wallet_get_name_ptr(wallet)
+#define NEOC_NEP6_WALLET_GET_NAME_2(wallet, out) neoc_nep6_wallet_get_name_copy(wallet, out)
+
+#define neoc_nep6_wallet_get_version(...) NEOC_PP_OVERLOAD(NEOC_NEP6_WALLET_GET_VERSION_, __VA_ARGS__)
+#define NEOC_NEP6_WALLET_GET_VERSION_1(wallet) neoc_nep6_wallet_get_version_ptr(wallet)
+#define NEOC_NEP6_WALLET_GET_VERSION_2(wallet, out) neoc_nep6_wallet_get_version_copy(wallet, out)
+
+#define NEOC_NEP6_WALLET_GET_SCRYPT_1(wallet) neoc_nep6_wallet_get_scrypt_copy(wallet)
+#define NEOC_NEP6_WALLET_GET_SCRYPT_2(wallet, out) neoc_nep6_wallet_get_scrypt_out(wallet, out)
+#define neoc_nep6_wallet_get_scrypt(...) NEOC_PP_OVERLOAD(NEOC_NEP6_WALLET_GET_SCRYPT_, __VA_ARGS__)
+
+#define NEOC_NEP6_WALLET_GET_ACCOUNT_COUNT_1(wallet) neoc_nep6_wallet_get_account_count_value(wallet)
+#define NEOC_NEP6_WALLET_GET_ACCOUNT_COUNT_2(wallet, out) neoc_nep6_wallet_get_account_count_out(wallet, out)
+#define neoc_nep6_wallet_get_account_count(...) NEOC_PP_OVERLOAD(NEOC_NEP6_WALLET_GET_ACCOUNT_COUNT_, __VA_ARGS__)
+
+#define NEOC_NEP6_WALLET_GET_DEFAULT_1(wallet) neoc_nep6_wallet_get_default_account_ptr(wallet)
+#define NEOC_NEP6_WALLET_GET_DEFAULT_2(wallet, out) neoc_nep6_wallet_get_default_account_out(wallet, out)
+#define neoc_nep6_wallet_get_default_account(...) NEOC_PP_OVERLOAD(NEOC_NEP6_WALLET_GET_DEFAULT_, __VA_ARGS__)
+
+#define neoc_nep6_wallet_get_account(wallet, key) \
+    _Generic((key), \
+        size_t: neoc_nep6_wallet_get_account_by_index, \
+        unsigned int: neoc_nep6_wallet_get_account_by_index, \
+        int: neoc_nep6_wallet_get_account_by_index, \
+        const char*: neoc_nep6_wallet_get_account_by_address, \
+        char*: neoc_nep6_wallet_get_account_by_address \
+    )(wallet, key)
+#endif /* NEOC_NEP6_DISABLE_OVERLOADS */
 
 #ifdef __cplusplus
 }

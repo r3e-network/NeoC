@@ -42,6 +42,12 @@ typedef struct {
     bool is_deployed;                       /**< Whether contract is deployed */
 } neoc_nep6_contract_t;
 
+const char* neoc_nep6_contract_get_script(const neoc_nep6_contract_t *contract);
+size_t neoc_nep6_contract_get_parameter_count(const neoc_nep6_contract_t *contract);
+neoc_nep6_parameter_t* neoc_nep6_contract_get_parameter(const neoc_nep6_contract_t *contract,
+                                                        size_t index);
+bool neoc_nep6_contract_is_deployed(const neoc_nep6_contract_t *contract);
+
 /**
  * @brief Create a new NEP-6 contract
  * 
@@ -106,6 +112,9 @@ neoc_error_t neoc_nep6_parameter_create(
     neoc_contract_parameter_type_t type,
     neoc_nep6_parameter_t **parameter
 );
+
+const char* neoc_nep6_parameter_get_name(const neoc_nep6_parameter_t *parameter);
+neoc_contract_parameter_type_t neoc_nep6_parameter_get_type(const neoc_nep6_parameter_t *parameter);
 
 /**
  * @brief Free a NEP-6 parameter

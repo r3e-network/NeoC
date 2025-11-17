@@ -43,6 +43,14 @@ typedef struct {
     size_t extra_count;                     /**< Number of extra fields */
 } neoc_nep6_account_t;
 
+#ifndef NEOC_PP_OVERLOAD
+#define NEOC_PP_CONCAT(a,b) NEOC_PP_CONCAT_IMPL(a,b)
+#define NEOC_PP_CONCAT_IMPL(a,b) a##b
+#define NEOC_PP_NARGS_IMPL(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,N,...) N
+#define NEOC_PP_NARGS(...) NEOC_PP_NARGS_IMPL(__VA_ARGS__,10,9,8,7,6,5,4,3,2,1,0)
+#define NEOC_PP_OVERLOAD(prefix, ...) NEOC_PP_CONCAT(prefix, NEOC_PP_NARGS(__VA_ARGS__))(__VA_ARGS__)
+#endif
+
 /**
  * @brief Create a new NEP-6 account
  * 
@@ -64,6 +72,25 @@ neoc_error_t neoc_nep6_account_create(
     neoc_nep6_contract_t *contract,
     neoc_nep6_account_t **account
 );
+
+neoc_error_t neoc_nep6_account_set_address(neoc_nep6_account_t *account, const char *address);
+const char* neoc_nep6_account_get_address(const neoc_nep6_account_t *account);
+
+neoc_error_t neoc_nep6_account_set_label(neoc_nep6_account_t *account, const char *label);
+const char* neoc_nep6_account_get_label(const neoc_nep6_account_t *account);
+
+neoc_error_t neoc_nep6_account_set_default(neoc_nep6_account_t *account, bool is_default);
+bool neoc_nep6_account_is_default(const neoc_nep6_account_t *account);
+
+neoc_error_t neoc_nep6_account_set_locked(neoc_nep6_account_t *account, bool lock);
+bool neoc_nep6_account_is_locked(const neoc_nep6_account_t *account);
+
+neoc_error_t neoc_nep6_account_set_key(neoc_nep6_account_t *account, const char *key);
+const char* neoc_nep6_account_get_key(const neoc_nep6_account_t *account);
+
+neoc_error_t neoc_nep6_account_set_contract(neoc_nep6_account_t *account,
+                                            neoc_nep6_contract_t *contract);
+neoc_nep6_contract_t* neoc_nep6_account_get_contract(const neoc_nep6_account_t *account);
 
 /**
  * @brief Free a NEP-6 account and its resources
@@ -121,6 +148,19 @@ neoc_error_t neoc_nep6_account_copy(
     const neoc_nep6_account_t *src,
     neoc_nep6_account_t **dest
 );
+
+#ifndef NEOC_NEP6_ACCOUNT_DISABLE_OVERLOADS
+#define NEOC_NEP6_ACCOUNT_CREATE_1(account_out) \
+    neoc_nep6_account_create(NULL, NULL, false, false, NULL, NULL, account_out)
+#define NEOC_NEP6_ACCOUNT_CREATE_3(address, label, account_out) \
+    neoc_nep6_account_create(address, label, false, false, NULL, NULL, account_out)
+#define NEOC_NEP6_ACCOUNT_CREATE_6(address, label, is_default, lock, key, account_out) \
+    neoc_nep6_account_create(address, label, is_default, lock, key, NULL, account_out)
+#define NEOC_NEP6_ACCOUNT_CREATE_7(address, label, is_default, lock, key, contract, account_out) \
+    neoc_nep6_account_create(address, label, is_default, lock, key, contract, account_out)
+#define neoc_nep6_account_create(...) \
+    NEOC_PP_OVERLOAD(NEOC_NEP6_ACCOUNT_CREATE_, __VA_ARGS__)
+#endif /* NEOC_NEP6_ACCOUNT_DISABLE_OVERLOADS */
 
 #ifdef __cplusplus
 }

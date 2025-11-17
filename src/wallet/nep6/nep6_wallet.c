@@ -123,13 +123,13 @@ neoc_error_t neoc_nep6_wallet_struct_to_json(const neoc_nep6_wallet_struct_t *wa
             if (neoc_nep6_account_to_json(wallet->accounts[i], &account_json) == NEOC_SUCCESS) {
                 neoc_json_t *account_obj = neoc_json_parse(account_json);
                 if (account_obj) {
-                    neoc_json_add_to_array(accounts, account_obj);
+                    neoc_json_array_add(accounts, account_obj);
                 }
                 neoc_free(account_json);
             }
         }
     }
-    neoc_json_add_array(json, "accounts", accounts);
+    neoc_json_add_object(json, "accounts", accounts);
     
     // Add extra fields if present
     if (wallet->extra && wallet->extra_count > 0) {
@@ -180,9 +180,18 @@ neoc_error_t neoc_nep6_wallet_struct_from_json(const char *json_str,
     // Parse scrypt parameters
     neoc_json_t *scrypt = neoc_json_get_object(json, "scrypt");
     if (scrypt) {
-        (*wallet)->scrypt.n = (uint32_t)neoc_json_get_number(scrypt, "n");
-        (*wallet)->scrypt.r = (uint32_t)neoc_json_get_number(scrypt, "r");
-        (*wallet)->scrypt.p = (uint32_t)neoc_json_get_number(scrypt, "p");
+        double value = 0.0;
+        if (neoc_json_get_number(scrypt, "n", &value) == NEOC_SUCCESS) {
+            (*wallet)->scrypt.n = (uint32_t)value;
+        }
+        value = 0.0;
+        if (neoc_json_get_number(scrypt, "r", &value) == NEOC_SUCCESS) {
+            (*wallet)->scrypt.r = (uint32_t)value;
+        }
+        value = 0.0;
+        if (neoc_json_get_number(scrypt, "p", &value) == NEOC_SUCCESS) {
+            (*wallet)->scrypt.p = (uint32_t)value;
+        }
     }
     
     // Parse accounts array
