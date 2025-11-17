@@ -259,12 +259,12 @@ neoc_error_t neoc_ec_key_pair_get_script_hash(const neoc_ec_key_pair_t *key_pair
 
 neoc_error_t neoc_ec_key_pair_sign(const neoc_ec_key_pair_t *key_pair,
                                     const uint8_t *message_hash,
-                                    struct neoc_ecdsa_signature_t **signature) {
+                                    neoc_ecdsa_signature_t **signature) {
     if (!key_pair || !message_hash || !signature || !key_pair->private_key) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
     
-    *signature = calloc(1, sizeof(struct neoc_ecdsa_signature_t));
+    *signature = calloc(1, sizeof(neoc_ecdsa_signature_t));
     if (!*signature) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate signature");
     }
@@ -456,8 +456,33 @@ neoc_error_t neoc_ec_public_key_get_encoded(const neoc_ec_public_key_t *public_k
         }
         memcpy(*encoded, public_key->uncompressed, 65);
     }
-    
+
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_ec_public_key_to_bytes(const neoc_ec_public_key_t *public_key,
+                                          uint8_t *bytes,
+                                          size_t *len) {
+    if (!public_key || !bytes || !len) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+    }
+
+    if (*len < 33) {
+        return neoc_error_set(NEOC_ERROR_BUFFER_TOO_SMALL, "Buffer too small for public key");
+    }
+
+    memcpy(bytes, public_key->compressed, 33);
+    *len = 33;
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_ec_public_key_clone(const neoc_ec_public_key_t *public_key,
+                                      neoc_ec_public_key_t **clone) {
+    if (!public_key || !clone) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+    }
+
+    return neoc_ec_public_key_from_bytes(public_key->compressed, 33, clone);
 }
 
 void neoc_ec_public_key_free(neoc_ec_public_key_t *public_key) {
@@ -526,6 +551,22 @@ neoc_error_t neoc_ec_key_pair_get_public_key(const neoc_ec_key_pair_t *key_pair,
     
     memcpy(public_key, key_pair->public_key->compressed, 33);
     *key_len = 33;
-    
+
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_ec_key_pair_get_public_key_object(const neoc_ec_key_pair_t *key_pair,
+                                                    neoc_ec_public_key_t **public_key) {
+    if (!key_pair || !public_key) {
+        return NEOC_ERROR_NULL_POINTER;
+    }
+
+    uint8_t encoded[65];
+    size_t encoded_len = sizeof(encoded);
+    neoc_error_t err = neoc_ec_key_pair_get_public_key(key_pair, encoded, &encoded_len);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    return neoc_ec_public_key_from_bytes(encoded, encoded_len, public_key);
 }
