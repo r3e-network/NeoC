@@ -333,14 +333,6 @@ void test_memory_leak_detection(void) {
  */
 void test_memory_statistics(void) {
     /* Memory statistics are now implemented */
-    #ifdef NEOC_DEBUG_MEMORY
-    typedef struct {
-        size_t total_allocated;
-        size_t current_allocated;
-        size_t allocation_count;
-        size_t free_count;
-    } neoc_memory_stats_t;
-    
     neoc_memory_stats_t stats_before, stats_after;
     
     // Get initial stats
@@ -367,9 +359,6 @@ void test_memory_statistics(void) {
     // Verify cleanup
     neoc_get_memory_stats(&stats_after);
     TEST_ASSERT_EQUAL_INT(stats_before.current_allocated, stats_after.current_allocated);
-    #else
-    TEST_IGNORE_MESSAGE("Memory statistics only available in debug builds");
-    #endif
 }
 #endif
 

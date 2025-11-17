@@ -35,11 +35,6 @@ void test_decrypt_with_default_scrypt_params(void) {
                                           NULL, // Use default params
                                           decrypted_private_key,
                                           sizeof(decrypted_private_key));
-    printf("NEP2 decrypt error code: %d\n", err);
-    if (err != NEOC_SUCCESS) {
-        TEST_IGNORE_MESSAGE("NEP2 decryption not fully implemented or test data mismatch");
-        return;
-    }
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Convert expected private key from hex
@@ -65,10 +60,6 @@ void test_decrypt_with_non_default_scrypt_params(void) {
                                           &params,
                                           decrypted_private_key,
                                           sizeof(decrypted_private_key));
-    if (err != NEOC_SUCCESS) {
-        TEST_IGNORE_MESSAGE("NEP2 decryption with custom params not fully implemented");
-        return;
-    }
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Convert expected private key from hex
@@ -152,10 +143,6 @@ void test_verify_password(void) {
     bool is_valid = neoc_nep2_verify_password(DEFAULT_ACCOUNT_ENCRYPTED_PRIVATE_KEY,
                                                DEFAULT_ACCOUNT_PASSWORD,
                                                NULL);
-    if (!is_valid) {
-        TEST_IGNORE_MESSAGE("NEP2 password verification not fully implemented");
-        return;
-    }
     TEST_ASSERT_TRUE(is_valid);
     
     // Test with wrong password

@@ -93,14 +93,8 @@ void test_params_with_nep2_encryption(void) {
     
     neoc_error_t err = neoc_nep2_encrypt(private_key, password, &custom_params,
                                           encrypted_key, sizeof(encrypted_key));
-    
-    // This might fail if NEP2 isn't fully implemented
-    if (err == NEOC_ERROR_NOT_IMPLEMENTED) {
-        TEST_IGNORE_MESSAGE("NEP2 encryption not yet implemented");
-    } else {
-        TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
-        TEST_ASSERT_TRUE(strlen(encrypted_key) > 0);
-    }
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    TEST_ASSERT_TRUE(strlen(encrypted_key) > 0);
 }
 
 void test_params_memory_cost(void) {

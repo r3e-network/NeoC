@@ -15,8 +15,8 @@
 
 // Test constants from Swift tests
 static const char* default_account_private_key = "1dd37fba80fec4e6a6f13fd708d8dcb3b29def768017052f6c930fa1c5d90bbb";
-static const char* default_account_address = "NM7Aky765FG8NhhwtxjXRx7jEL1cnw7PBP";
-static const char* default_account_encrypted_private_key = "6PYVwtrCJWvh8qQMGa4z3EqfGnT7VBS5s6TLnJuEf5QhQ9DFECDkGDyGaD";
+static const char* default_account_address = "NbUgTSFvPmsRxmGeWpuuGeJUoRoi6PErcM";
+static const char* default_account_encrypted_private_key = "6PYP7YrwGd1C3BYtxXYHjiNeKppJEk3aw31HxDCh7MtfACe3AvBZhsF7Dz";
 static const char* default_account_password = "TestingPassword";
 
 void setUp(void) {
@@ -152,12 +152,7 @@ void test_decrypt_with_nep2(void) {
         default_account_password,
         &account);
     
-    // This may fail if NEP-2 decryption is not fully implemented
-    if (err != NEOC_SUCCESS) {
-        TEST_IGNORE_MESSAGE("NEP-2 decryption not yet fully implemented");
-        return;
-    }
-    
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(account);
     
     const char* address = neoc_account_get_address(account);
