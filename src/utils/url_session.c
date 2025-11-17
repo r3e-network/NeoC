@@ -389,8 +389,15 @@ neoc_error_t neoc_url_session_perform_request(neoc_url_session_t *session,
     }
 
     if (request->method == NEOC_HTTP_POST || request->method == NEOC_HTTP_PUT || request->method == NEOC_HTTP_PATCH) {
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request->body && request->body->data ? request->body->data : "");
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, request->body ? (long)request->body->length : 0L);
+        const char *post_fields = "";
+        size_t post_length = 0;
+        if (request->body && request->body->data && request->body->length > 0) {
+            post_fields = (const char *)request->body->data;
+            post_length = request->body->length;
+        }
+
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_fields);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)post_length);
     } else if (request->method == NEOC_HTTP_DELETE) {
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
     } else if (request->method == NEOC_HTTP_HEAD) {

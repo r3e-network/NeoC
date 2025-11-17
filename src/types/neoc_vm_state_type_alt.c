@@ -3,7 +3,7 @@
  * @brief Neo VM state type implementation
  */
 
-#include "neoc/types/neo_v_m_state_type.h"
+#include "neoc/types/neoc_vm_state_type.h"
 #include "neoc/neoc_memory.h"
 #include <string.h>
 #include <stdio.h>

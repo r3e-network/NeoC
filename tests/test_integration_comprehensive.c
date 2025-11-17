@@ -44,12 +44,18 @@ void test_complete_wallet_creation_workflow(void) {
     // 1. Create new wallet
     neoc_wallet_t* wallet;
     neoc_error_t err = neoc_wallet_create(WALLET_NAME, &wallet);
+    if (err != NEOC_SUCCESS) {
+        printf("  neoc_nep2_encrypt_key_pair failed with error %d\n", err);
+    }
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(wallet);
     
     // 2. Create multiple accounts
     neoc_account_t* account1;
     err = neoc_account_create_random(&account1);
+    if (err != NEOC_SUCCESS) {
+        printf("  neoc_nep2_decrypt_key_pair failed with error %d\n", err);
+    }
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     neoc_account_t* account2;
@@ -185,7 +191,10 @@ void test_nep2_encryption_workflow(void) {
     
     // 4. Encrypt with NEP-2
     char* encrypted_key;
-    err = neoc_nep2_encrypt(TEST_PASSWORD, original_key_pair, NULL, &encrypted_key);
+    err = neoc_nep2_encrypt_key_pair(original_key_pair, TEST_PASSWORD, NULL, &encrypted_key);
+    if (err != NEOC_SUCCESS) {
+        printf("  neoc_nep2_encrypt_key_pair returned %d\n", err);
+    }
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(encrypted_key);
     
@@ -193,7 +202,7 @@ void test_nep2_encryption_workflow(void) {
     
     // 5. Decrypt with NEP-2
     neoc_ec_key_pair_t* decrypted_key_pair;
-    err = neoc_nep2_decrypt(TEST_PASSWORD, encrypted_key, NULL, &decrypted_key_pair);
+    err = neoc_nep2_decrypt_key_pair(encrypted_key, TEST_PASSWORD, NULL, &decrypted_key_pair);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // 6. Verify private key matches
@@ -273,7 +282,7 @@ void test_gas_transfer_transaction_workflow(void) {
     uint64_t amount = 100000000; // 1 GAS (8 decimals)
     uint8_t* transfer_script;
     size_t script_len;
-    err = neoc_gas_token_build_transfer_script(gas_token, &sender_hash, &receiver_hash, amount, NULL, &transfer_script, &script_len);
+    err = neoc_gas_token_build_transfer_script(gas_token, &sender_hash, &receiver_hash, amount, NULL, 0, &transfer_script, &script_len);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(transfer_script);
     TEST_ASSERT_TRUE(script_len > 0);
@@ -638,17 +647,17 @@ void test_error_recovery_workflow(void) {
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     char* encrypted_key;
-    err = neoc_nep2_encrypt(TEST_PASSWORD, key_pair, NULL, &encrypted_key);
+    err = neoc_nep2_encrypt_key_pair(key_pair, TEST_PASSWORD, NULL, &encrypted_key);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Try to decrypt with wrong password
     neoc_ec_key_pair_t* decrypted_key_pair;
-    err = neoc_nep2_decrypt("wrong_password", encrypted_key, NULL, &decrypted_key_pair);
+    err = neoc_nep2_decrypt_key_pair(encrypted_key, "wrong_password", NULL, &decrypted_key_pair);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     printf("  Correctly handled wrong NEP-2 password\n");
     
     // 4. Test correct password still works
-    err = neoc_nep2_decrypt(TEST_PASSWORD, encrypted_key, NULL, &decrypted_key_pair);
+    err = neoc_nep2_decrypt_key_pair(encrypted_key, TEST_PASSWORD, NULL, &decrypted_key_pair);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     printf("  NEP-2 decryption works with correct password\n");
     

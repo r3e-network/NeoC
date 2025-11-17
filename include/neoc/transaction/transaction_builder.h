@@ -23,6 +23,7 @@ extern "C" {
 
 // Forward declarations
 typedef struct neoc_tx_builder_t neoc_tx_builder_t;
+typedef neoc_tx_builder_t neoc_transaction_builder_t;
 #ifndef NEOC_RPC_CLIENT_FORWARD_DECLARED
 #define NEOC_RPC_CLIENT_FORWARD_DECLARED
 typedef struct neoc_rpc_client_t neoc_rpc_client_t;
@@ -48,6 +49,7 @@ typedef struct neoc_rpc_client_t neoc_rpc_client_t;
  * @return NEOC_SUCCESS on success, error code otherwise
  */
 neoc_error_t neoc_tx_builder_create(neoc_tx_builder_t **builder);
+neoc_error_t neoc_transaction_builder_create(neoc_transaction_builder_t **builder);
 
 /**
  * @brief Set the transaction version
@@ -57,6 +59,7 @@ neoc_error_t neoc_tx_builder_create(neoc_tx_builder_t **builder);
  * @return NEOC_SUCCESS on success, error code otherwise
  */
 neoc_error_t neoc_tx_builder_set_version(neoc_tx_builder_t *builder, uint8_t version);
+neoc_error_t neoc_transaction_builder_set_version(neoc_transaction_builder_t *builder, uint8_t version);
 
 /**
  * @brief Set the transaction nonce
@@ -66,6 +69,7 @@ neoc_error_t neoc_tx_builder_set_version(neoc_tx_builder_t *builder, uint8_t ver
  * @return NEOC_SUCCESS on success, error code otherwise
  */
 neoc_error_t neoc_tx_builder_set_nonce(neoc_tx_builder_t *builder, uint32_t nonce);
+neoc_error_t neoc_transaction_builder_set_nonce(neoc_transaction_builder_t *builder, uint32_t nonce);
 
 /**
  * @brief Set the valid until block
@@ -76,6 +80,8 @@ neoc_error_t neoc_tx_builder_set_nonce(neoc_tx_builder_t *builder, uint32_t nonc
  */
 neoc_error_t neoc_tx_builder_set_valid_until_block(neoc_tx_builder_t *builder, 
                                                      uint32_t block_height);
+neoc_error_t neoc_transaction_builder_set_valid_until_block(neoc_transaction_builder_t *builder,
+                                                            uint32_t block_height);
 
 /**
  * @brief Set the transaction script
@@ -88,6 +94,9 @@ neoc_error_t neoc_tx_builder_set_valid_until_block(neoc_tx_builder_t *builder,
 neoc_error_t neoc_tx_builder_set_script(neoc_tx_builder_t *builder,
                                          const uint8_t *script,
                                          size_t script_size);
+neoc_error_t neoc_transaction_builder_set_script(neoc_transaction_builder_t *builder,
+                                                 const uint8_t *script,
+                                                 size_t script_size);
 
 /**
  * @brief Add a signer to the transaction
@@ -98,6 +107,8 @@ neoc_error_t neoc_tx_builder_set_script(neoc_tx_builder_t *builder,
  */
 neoc_error_t neoc_tx_builder_add_signer(neoc_tx_builder_t *builder,
                                          const neoc_signer_t *signer);
+neoc_error_t neoc_transaction_builder_add_signer(neoc_transaction_builder_t *builder,
+                                                 const neoc_signer_t *signer);
 
 /**
  * @brief Add a signer from account
@@ -110,6 +121,9 @@ neoc_error_t neoc_tx_builder_add_signer(neoc_tx_builder_t *builder,
 neoc_error_t neoc_tx_builder_add_signer_from_account(neoc_tx_builder_t *builder,
                                                       const neoc_account_t *account,
                                                       neoc_witness_scope_t scope);
+neoc_error_t neoc_transaction_builder_add_signer_from_account(neoc_transaction_builder_t *builder,
+                                                              const neoc_account_t *account,
+                                                              neoc_witness_scope_t scope);
 
 /**
  * @brief Set the first signer (fee payer)
@@ -120,6 +134,8 @@ neoc_error_t neoc_tx_builder_add_signer_from_account(neoc_tx_builder_t *builder,
  */
 neoc_error_t neoc_tx_builder_set_first_signer(neoc_tx_builder_t *builder,
                                                const neoc_account_t *account);
+neoc_error_t neoc_transaction_builder_set_first_signer(neoc_transaction_builder_t *builder,
+                                                       const neoc_account_t *account);
 
 /**
  * @brief Add a transaction attribute
@@ -150,6 +166,8 @@ neoc_error_t neoc_tx_builder_set_high_priority(neoc_tx_builder_t *builder,
  */
 neoc_error_t neoc_tx_builder_add_network_fee(neoc_tx_builder_t *builder,
                                               uint64_t fee);
+neoc_error_t neoc_transaction_builder_add_network_fee(neoc_transaction_builder_t *builder,
+                                                      uint64_t fee);
 
 /**
  * @brief Add additional system fee
@@ -160,6 +178,8 @@ neoc_error_t neoc_tx_builder_add_network_fee(neoc_tx_builder_t *builder,
  */
 neoc_error_t neoc_tx_builder_add_system_fee(neoc_tx_builder_t *builder,
                                              uint64_t fee);
+neoc_error_t neoc_transaction_builder_add_system_fee(neoc_transaction_builder_t *builder,
+                                                     uint64_t fee);
 
 /**
  * @brief Calculate fees for the transaction (requires RPC client)
@@ -184,6 +204,8 @@ neoc_error_t neoc_tx_builder_calculate_fees(neoc_tx_builder_t *builder,
  */
 neoc_error_t neoc_tx_builder_build_unsigned(neoc_tx_builder_t *builder,
                                             neoc_transaction_t **transaction);
+neoc_error_t neoc_transaction_builder_build(neoc_transaction_builder_t *builder,
+                                            neoc_transaction_t **transaction);
 
 /**
  * @brief Sign the transaction with accounts
@@ -196,6 +218,9 @@ neoc_error_t neoc_tx_builder_build_unsigned(neoc_tx_builder_t *builder,
 neoc_error_t neoc_tx_builder_sign(neoc_tx_builder_t *builder,
                                    neoc_account_t **accounts,
                                    size_t account_count);
+neoc_error_t neoc_transaction_builder_sign(neoc_transaction_builder_t *builder,
+                                           neoc_account_t **accounts,
+                                           size_t account_count);
 
 /**
  * @brief Build and sign the transaction
@@ -210,6 +235,10 @@ neoc_error_t neoc_tx_builder_build_and_sign(neoc_tx_builder_t *builder,
                                              neoc_account_t **accounts,
                                              size_t account_count,
                                              neoc_transaction_t **transaction);
+neoc_error_t neoc_transaction_builder_build_and_sign(neoc_transaction_builder_t *builder,
+                                                     neoc_account_t **accounts,
+                                                     size_t account_count,
+                                                     neoc_transaction_t **transaction);
 
 /**
  * @brief Get the transaction hash
@@ -234,6 +263,10 @@ neoc_error_t neoc_tx_builder_serialize(const neoc_tx_builder_t *builder,
                                         uint8_t *buffer,
                                         size_t buffer_size,
                                         size_t *serialized_size);
+neoc_error_t neoc_transaction_builder_serialize(const neoc_transaction_builder_t *builder,
+                                                uint8_t *buffer,
+                                                size_t buffer_size,
+                                                size_t *serialized_size);
 
 /**
  * @brief Free transaction builder
@@ -241,6 +274,7 @@ neoc_error_t neoc_tx_builder_serialize(const neoc_tx_builder_t *builder,
  * @param builder Transaction builder to free
  */
 void neoc_tx_builder_free(neoc_tx_builder_t *builder);
+void neoc_transaction_builder_free(neoc_transaction_builder_t *builder);
 
 // Helper functions for common transaction patterns
 

@@ -1,40 +1,27 @@
-/**
- * @file test_test_properties.c
- * @brief Unit tests converted from TestProperties.swift
- */
-
-#include <stdio.h>
+#include "unity.h"
 #include <string.h>
-#include <assert.h>
 #include "neoc/neoc.h"
 
-// Test setup
-static void setUp(void) {
-    neoc_error_t err = neoc_init();
-    assert(err == NEOC_SUCCESS);
+void setUp(void) {
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, neoc_init());
 }
 
-// Test teardown
-static void tearDown(void) {
+void tearDown(void) {
     neoc_cleanup();
 }
 
-// Placeholder test
-static void test_placeholder(void) {
-    printf("Test placeholder for TestProperties\n");
-    assert(1 == 1);
+void test_neoc_version_and_build_info(void) {
+    const char *version = neoc_get_version();
+    const char *build = neoc_get_build_info();
+    TEST_ASSERT_NOT_NULL(version);
+    TEST_ASSERT_NOT_NULL(build);
+    TEST_ASSERT_TRUE(strlen(version) > 0);
+    TEST_ASSERT_TRUE(strlen(build) > 0);
 }
 
 int main(void) {
-    printf("\n=== TestProperties Tests ===\n\n");
-    
-    setUp();
-    
-    // Run tests
-    test_placeholder();
-    
-    tearDown();
-    
-    printf("\n✅ All TestProperties tests passed!\n\n");
+    UNITY_BEGIN();
+    RUN_TEST(test_neoc_version_and_build_info);
+    UNITY_END();
     return 0;
 }

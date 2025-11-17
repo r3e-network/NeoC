@@ -135,7 +135,7 @@ static neoc_error_t neoc_contract_param_to_cjson(const neoc_contract_parameter_t
             char hash_hex[NEOC_HASH160_STRING_LENGTH];
             err = neoc_hash160_to_hex(&param->value.hash160, hash_hex, sizeof(hash_hex), false);
             if (err == NEOC_SUCCESS) {
-                char prefixed[NEOC_HASH160_STRING_LENGTH];
+                char prefixed[NEOC_HASH160_STRING_LENGTH + 3];
                 snprintf(prefixed, sizeof(prefixed), "0x%s", hash_hex);
                 if (!cJSON_AddStringToObject(obj, "value", prefixed)) {
                     err = neoc_error_set(NEOC_ERROR_OUT_OF_MEMORY, "Failed to encode hash160 parameter");
@@ -333,7 +333,7 @@ static neoc_error_t neoc_signer_to_cjson(const neoc_signer_t *signer, cJSON **ou
         return err;
     }
 
-    char account_prefixed[NEOC_HASH160_STRING_LENGTH];
+    char account_prefixed[NEOC_HASH160_STRING_LENGTH + 3];
     snprintf(account_prefixed, sizeof(account_prefixed), "0x%s", hash_hex);
     if (!cJSON_AddStringToObject(obj, "account", account_prefixed)) {
         cJSON_Delete(obj);
@@ -400,7 +400,7 @@ static neoc_error_t neoc_signer_to_cjson(const neoc_signer_t *signer, cJSON **ou
                 cJSON_Delete(obj);
                 return err;
             }
-            char prefixed[NEOC_HASH160_STRING_LENGTH];
+            char prefixed[NEOC_HASH160_STRING_LENGTH + 3];
             snprintf(prefixed, sizeof(prefixed), "0x%s", contract_hex);
             cJSON *contract_node = cJSON_CreateString(prefixed);
             if (!contract_node) {
@@ -905,7 +905,7 @@ neoc_error_t neoc_neo_invoke_function(neoc_neo_client_t *client,
         return err;
     }
 
-    char contract_prefixed[NEOC_HASH160_STRING_LENGTH];
+    char contract_prefixed[NEOC_HASH160_STRING_LENGTH + 3];
     snprintf(contract_prefixed, sizeof(contract_prefixed), "0x%s", contract_hex);
 
     cJSON *contract_node = cJSON_CreateString(contract_prefixed);

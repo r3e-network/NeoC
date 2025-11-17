@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include "neoc/neoc_error.h"
 #include "neoc/contract/fungible_token.h"
+#include "neoc/protocol/rpc_client.h"
 #include "neoc/types/neoc_hash160.h"
 
 #ifdef __cplusplus
@@ -55,6 +56,7 @@ neoc_error_t neoc_gas_token_create(neoc_gas_token_t **token);
  * @return Error code
  */
 neoc_error_t neoc_gas_token_balance_of(neoc_gas_token_t *token,
+                                       neoc_rpc_client_t *rpc_client,
                                        const neoc_hash160_t *account,
                                        uint64_t *balance);
 

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 struct neoc_neo_uri {
     char *address;
@@ -136,7 +137,7 @@ neoc_error_t neoc_neo_uri_build(const char *address,
         if (amount > 0) {
             if (!first) strcat(*uri, "&");
             char amount_str[32];
-            snprintf(amount_str, sizeof(amount_str), "amount=%llu", amount);
+            snprintf(amount_str, sizeof(amount_str), "amount=%" PRIu64, (uint64_t)amount);
             strcat(*uri, amount_str);
             first = false;
         }
@@ -219,4 +220,3 @@ void neoc_neo_uri_free(neoc_neo_uri_t *uri) {
     neoc_free(uri->description);
     neoc_free(uri);
 }
-

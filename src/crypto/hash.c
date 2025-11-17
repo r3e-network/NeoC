@@ -79,8 +79,8 @@ uint32_t neoc_hash_murmur32(const uint8_t *data, size_t len, uint32_t seed) {
     uint32_t k1 = 0;
     
     switch (len & 3) {
-        case 3: k1 ^= tail[2] << 16;
-        case 2: k1 ^= tail[1] << 8;
+        case 3: k1 ^= tail[2] << 16; /* fall through */
+        case 2: k1 ^= tail[1] << 8;  /* fall through */
         case 1: k1 ^= tail[0];
             k1 *= c1;
             k1 = (k1 << r1) | (k1 >> (32 - r1));

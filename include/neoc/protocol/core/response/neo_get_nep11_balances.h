@@ -29,7 +29,7 @@ extern "C" {
 typedef struct {
     char *token_id;                     /**< Unique token identifier */
     char *amount;                       /**< Token amount as string */
-    int last_updated_block;             /**< Block when last updated */
+    int64_t last_updated_block;         /**< Block when last updated */
 } neoc_nep11_token_t;
 
 /**

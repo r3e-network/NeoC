@@ -194,8 +194,14 @@ neoc_neo_c_config_t *neoc_neo_c_config_create(void) {
     config->scheduled_executor = NULL;
     
     // Create default NNS resolver hash from hex string
-    config->nns_resolver = neoc_hash160_from_string(NEOC_CONFIG_MAINNET_NNS_CONTRACT_HASH);
+    config->nns_resolver = neoc_calloc(1, sizeof(neoc_hash160_t));
     if (!config->nns_resolver) {
+        neoc_free(config);
+        return NULL;
+    }
+    if (neoc_hash160_from_string(NEOC_CONFIG_MAINNET_NNS_CONTRACT_HASH,
+                                  config->nns_resolver) != NEOC_SUCCESS) {
+        neoc_free(config->nns_resolver);
         neoc_free(config);
         return NULL;
     }
@@ -241,18 +247,29 @@ neoc_neo_c_config_t *neoc_neo_c_config_create_custom(
     config->scheduled_executor = NULL;
     
     // Copy NNS resolver
-    if (nns_resolver) {
-        config->nns_resolver = neoc_hash160_copy(nns_resolver);
-    } else {
-        config->nns_resolver = neoc_hash160_from_string(NEOC_CONFIG_MAINNET_NNS_CONTRACT_HASH);
-    }
-    
+    config->nns_resolver = neoc_calloc(1, sizeof(neoc_hash160_t));
     if (!config->nns_resolver) {
         if (config->network_magic) {
             neoc_free(config->network_magic);
         }
         neoc_free(config);
         return NULL;
+    }
+    if (nns_resolver) {
+        if (neoc_hash160_copy(config->nns_resolver, nns_resolver) != NEOC_SUCCESS) {
+            if (config->network_magic) neoc_free(config->network_magic);
+            neoc_free(config->nns_resolver);
+            neoc_free(config);
+            return NULL;
+        }
+    } else {
+        if (neoc_hash160_from_string(NEOC_CONFIG_MAINNET_NNS_CONTRACT_HASH,
+                                      config->nns_resolver) != NEOC_SUCCESS) {
+            if (config->network_magic) neoc_free(config->network_magic);
+            neoc_free(config->nns_resolver);
+            neoc_free(config);
+            return NULL;
+        }
     }
     
     // Ensure global config is initialized
@@ -286,7 +303,7 @@ neoc_error_t neoc_neo_c_config_set_network_magic(neoc_neo_c_config_t *config, in
     }
     
     // Check that magic fits in 32-bit unsigned integer
-    if (magic < 0 || magic > 0xFFFFFFFF) {
+    if (magic < 0 || (uint64_t)magic > 0xFFFFFFFFu) {
         return NEOC_ERROR_INVALID_ARGUMENT;
     }
     
@@ -342,14 +359,16 @@ neoc_error_t neoc_neo_c_config_set_nns_resolver(neoc_neo_c_config_t *config, con
     }
     
     // Free old resolver if exists
-    if (config->nns_resolver) {
-        neoc_hash160_free(config->nns_resolver);
-    }
-    
-    // Copy new resolver
-    config->nns_resolver = neoc_hash160_copy(nns_resolver);
     if (!config->nns_resolver) {
-        return NEOC_ERROR_OUT_OF_MEMORY;
+        config->nns_resolver = neoc_calloc(1, sizeof(neoc_hash160_t));
+        if (!config->nns_resolver) {
+            return NEOC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    neoc_error_t err = neoc_hash160_copy(config->nns_resolver, nns_resolver);
+    if (err != NEOC_SUCCESS) {
+        return err;
     }
     
     return NEOC_SUCCESS;
@@ -392,9 +411,8 @@ void neoc_neo_c_config_free(neoc_neo_c_config_t *config) {
     }
     
     if (config->nns_resolver) {
-        neoc_hash160_free(config->nns_resolver);
+        neoc_free(config->nns_resolver);
     }
     
     neoc_free(config);
 }
-

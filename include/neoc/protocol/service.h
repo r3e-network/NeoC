@@ -120,6 +120,18 @@ neoc_error_t neoc_service_init(neoc_service_t *service,
                                void *impl_data);
 
 /**
+ * @brief Create a service instance
+ *
+ * @param type Service type
+ * @param config Service configuration
+ * @param service Output service (caller must free)
+ * @return NEOC_SUCCESS on success, error code on failure
+ */
+neoc_error_t neoc_service_create(neoc_service_type_t type,
+                                 const neoc_service_config_t *config,
+                                 neoc_service_t **service);
+
+/**
  * @brief Free a service
  * 
  * @param service Service to free
@@ -190,6 +202,26 @@ const char* neoc_service_get_url(const neoc_service_t *service);
  * @return NEOC_SUCCESS on success, error code on failure
  */
 neoc_error_t neoc_service_set_url(neoc_service_t *service, const char *url);
+
+/**
+ * @brief Retrieve the current service configuration
+ *
+ * @param service Service instance
+ * @param config Output configuration (caller must free endpoint_url)
+ * @return NEOC_SUCCESS on success, error code on failure
+ */
+neoc_error_t neoc_service_get_config(neoc_service_t *service,
+                                     neoc_service_config_t *config);
+
+/**
+ * @brief Update the service configuration
+ *
+ * @param service Service instance
+ * @param config New configuration
+ * @return NEOC_SUCCESS on success, error code on failure
+ */
+neoc_error_t neoc_service_set_config(neoc_service_t *service,
+                                     const neoc_service_config_t *config);
 
 /**
  * @brief Get service type as string

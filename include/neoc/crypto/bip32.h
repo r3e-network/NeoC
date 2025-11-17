@@ -33,7 +33,7 @@ extern "C" {
 /**
  * @brief BIP-32 extended key structure
  */
-typedef struct {
+typedef struct neoc_bip32_key {
     uint8_t version[4];           // Version bytes (mainnet/testnet, public/private)
     uint8_t depth;                // Depth in derivation tree
     uint8_t parent_fingerprint[BIP32_FINGERPRINT_SIZE]; // Parent key fingerprint
@@ -51,9 +51,12 @@ typedef struct {
  * @param master_key Output master key
  * @return NEOC_SUCCESS on success, error code otherwise
  */
-neoc_error_t neoc_bip32_from_seed(const uint8_t *seed,
-                                   size_t seed_len,
-                                   neoc_bip32_key_t *master_key);
+neoc_error_t neoc_bip32_from_seed_raw(const uint8_t *seed,
+                                      size_t seed_len,
+                                      neoc_bip32_key_t *master_key);
+neoc_error_t neoc_bip32_from_seed_alloc(const uint8_t *seed,
+                                        size_t seed_len,
+                                        neoc_bip32_key_t **master_key);
 
 /**
  * @brief Derive child key from parent
@@ -75,9 +78,9 @@ neoc_error_t neoc_bip32_derive_child(const neoc_bip32_key_t *parent,
  * @param derived Output derived key
  * @return NEOC_SUCCESS on success, error code otherwise
  */
-neoc_error_t neoc_bip32_derive_path(const neoc_bip32_key_t *master,
-                                     const char *path,
-                                     neoc_bip32_key_t *derived);
+neoc_error_t neoc_bip32_derive_path_raw(const neoc_bip32_key_t *master,
+                                        const char *path,
+                                        neoc_bip32_key_t *derived);
 
 /**
  * @brief Derive key from path components
@@ -92,6 +95,10 @@ neoc_error_t neoc_bip32_derive_path_indices(const neoc_bip32_key_t *master,
                                              const uint32_t *indices,
                                              size_t indices_count,
                                              neoc_bip32_key_t *derived);
+neoc_error_t neoc_bip32_derive_path_indices_alloc(const neoc_bip32_key_t *master,
+                                                  const uint32_t *indices,
+                                                  size_t indices_count,
+                                                  neoc_bip32_key_t **derived);
 
 /**
  * @brief Get public key from extended key
@@ -110,8 +117,10 @@ neoc_error_t neoc_bip32_get_public_key(const neoc_bip32_key_t *key,
  * @param ec_key Output EC key pair
  * @return NEOC_SUCCESS on success, error code otherwise
  */
-neoc_error_t neoc_bip32_to_ec_key_pair(const neoc_bip32_key_t *bip32_key,
-                                        neoc_ec_key_pair_t *ec_key);
+neoc_error_t neoc_bip32_to_ec_key_pair_raw(const neoc_bip32_key_t *bip32_key,
+                                           neoc_ec_key_pair_t *ec_key);
+neoc_error_t neoc_bip32_to_ec_key_pair_alloc(const neoc_bip32_key_t *bip32_key,
+                                             neoc_ec_key_pair_t **ec_key);
 
 /**
  * @brief Serialize extended key to base58
@@ -158,6 +167,60 @@ neoc_error_t neoc_bip32_parse_path(const char *path,
                                     uint32_t *indices,
                                     size_t max_indices,
                                     size_t *indices_count);
+
+void neoc_bip32_key_free(neoc_bip32_key_t *key);
+
+#ifndef NEOC_PP_OVERLOAD
+#define NEOC_PP_CONCAT(a,b) NEOC_PP_CONCAT_IMPL(a,b)
+#define NEOC_PP_CONCAT_IMPL(a,b) a##b
+#define NEOC_PP_NARGS_IMPL(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,N,...) N
+#define NEOC_PP_NARGS(...) NEOC_PP_NARGS_IMPL(__VA_ARGS__,10,9,8,7,6,5,4,3,2,1,0)
+#define NEOC_PP_OVERLOAD(prefix, ...) NEOC_PP_CONCAT(prefix, NEOC_PP_NARGS(__VA_ARGS__))(__VA_ARGS__)
+#endif
+
+static inline neoc_error_t neoc_bip32_from_seed_wrapper(const uint8_t *seed,
+                                                        size_t seed_len,
+                                                        void *out,
+                                                        size_t elem_size) {
+    if (elem_size == sizeof(neoc_bip32_key_t)) {
+        return neoc_bip32_from_seed_raw(seed, seed_len, (neoc_bip32_key_t *)out);
+    }
+    return neoc_bip32_from_seed_alloc(seed, seed_len, (neoc_bip32_key_t **)out);
+}
+
+#define neoc_bip32_from_seed(seed, len, out) \
+    neoc_bip32_from_seed_wrapper((seed), (len), (void *)(out), sizeof(*(out)))
+
+#define NEOC_BIP32_DERIVE_PATH_3(master, path, out) \
+    neoc_bip32_derive_path_raw(master, path, out)
+#define NEOC_BIP32_DERIVE_PATH_4(master, indices, count, out) \
+    neoc_bip32_derive_path_indices_wrapper((master), (indices), (count), (void *)(out), sizeof(*(out)))
+
+#define neoc_bip32_derive_path(...) \
+    NEOC_PP_OVERLOAD(NEOC_BIP32_DERIVE_PATH_, __VA_ARGS__)
+
+static inline neoc_error_t neoc_bip32_derive_path_indices_wrapper(const neoc_bip32_key_t *master,
+                                                                  const uint32_t *indices,
+                                                                  size_t count,
+                                                                  void *out,
+                                                                  size_t elem_size) {
+    if (elem_size == sizeof(neoc_bip32_key_t)) {
+        return neoc_bip32_derive_path_indices(master, indices, count, (neoc_bip32_key_t *)out);
+    }
+    return neoc_bip32_derive_path_indices_alloc(master, indices, count, (neoc_bip32_key_t **)out);
+}
+
+static inline neoc_error_t neoc_bip32_to_ec_key_pair_wrapper(const neoc_bip32_key_t *bip32_key,
+                                                             void *out,
+                                                             size_t elem_size) {
+    if (elem_size == sizeof(neoc_ec_key_pair_t)) {
+        return neoc_bip32_to_ec_key_pair_raw(bip32_key, (neoc_ec_key_pair_t *)out);
+    }
+    return neoc_bip32_to_ec_key_pair_alloc(bip32_key, (neoc_ec_key_pair_t **)out);
+}
+
+#define neoc_bip32_to_ec_key_pair(bip32_key, out) \
+    neoc_bip32_to_ec_key_pair_wrapper((bip32_key), (void *)(out), sizeof(*(out)))
 
 /**
  * @brief Get default Neo derivation path indices

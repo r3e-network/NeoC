@@ -11,10 +11,17 @@
 
 #include "neoc/neoc_error.h"
 #include "neoc/neoc_memory.h"
+#include "neoc/crypto/ec_key_pair.h"
 #include "neoc/types/hash160.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+
+#ifndef NEOC_FORWARD_DECLARATIONS
+#define NEOC_FORWARD_DECLARATIONS
+typedef struct neoc_binary_reader neoc_binary_reader_t;
+typedef struct neoc_binary_writer neoc_binary_writer_t;
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,6 +43,9 @@ typedef enum {
     NEOC_WITNESS_CONDITION_CALLED_BY_CONTRACT = 0x28,
     NEOC_WITNESS_CONDITION_CALLED_BY_GROUP = 0x29
 } neoc_witness_condition_type_t;
+
+#define NEOC_WITNESS_CONDITION_MAX_SUBITEMS 16
+#define NEOC_WITNESS_CONDITION_MAX_NESTING_DEPTH 2
 
 /**
  * @brief Forward declaration of witness condition
@@ -65,12 +75,11 @@ struct neoc_witness_condition {
         } logical;                      /**< AND/OR expressions */
         
         struct {
-            neoc_hash160_t *hash;       /**< Script or contract hash */
+            neoc_hash160_t hash;        /**< Script or contract hash */
         } hash_condition;
         
         struct {
-            uint8_t *public_key;        /**< Public key bytes */
-            size_t key_length;          /**< Public key length */
+            neoc_ec_public_key_t *public_key; /**< Group key (owned) */
         } group_condition;
     } data;
 };
@@ -150,8 +159,7 @@ neoc_error_t neoc_witness_condition_create_script_hash(
  * @return NEOC_SUCCESS on success, error code on failure
  */
 neoc_error_t neoc_witness_condition_create_group(
-    const uint8_t *public_key,
-    size_t key_length,
+    const neoc_ec_public_key_t *public_key,
     neoc_witness_condition_t **condition
 );
 
@@ -186,8 +194,7 @@ neoc_error_t neoc_witness_condition_create_called_by_contract(
  * @return NEOC_SUCCESS on success, error code on failure
  */
 neoc_error_t neoc_witness_condition_create_called_by_group(
-    const uint8_t *group_key,
-    size_t key_length,
+    const neoc_ec_public_key_t *group_key,
     neoc_witness_condition_t **condition
 );
 
@@ -210,6 +217,18 @@ void neoc_witness_condition_free(
  */
 neoc_witness_condition_type_t neoc_witness_condition_get_type(
     const neoc_witness_condition_t *condition
+);
+
+/**
+ * @brief Get boolean value from condition
+ *
+ * @param condition Witness condition (must be BOOLEAN)
+ * @param value Output boolean value
+ * @return NEOC_SUCCESS on success, error code otherwise
+ */
+neoc_error_t neoc_witness_condition_get_boolean(
+    const neoc_witness_condition_t *condition,
+    bool *value
 );
 
 /**
@@ -264,6 +283,30 @@ neoc_error_t neoc_witness_condition_to_json(
  */
 size_t neoc_witness_condition_get_size(
     const neoc_witness_condition_t *condition
+);
+
+/**
+ * @brief Serialize a witness condition using the Neo binary format.
+ *
+ * @param condition Condition to serialize
+ * @param writer Binary writer to receive bytes
+ * @return NEOC_SUCCESS on success, error code on failure
+ */
+neoc_error_t neoc_witness_condition_serialize(
+    const neoc_witness_condition_t *condition,
+    neoc_binary_writer_t *writer
+);
+
+/**
+ * @brief Deserialize a witness condition from a binary reader.
+ *
+ * @param reader Binary reader positioned at the condition
+ * @param condition Output condition (caller must free)
+ * @return NEOC_SUCCESS on success, error code on failure
+ */
+neoc_error_t neoc_witness_condition_deserialize(
+    neoc_binary_reader_t *reader,
+    neoc_witness_condition_t **condition
 );
 
 /**

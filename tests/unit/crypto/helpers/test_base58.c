@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include "neoc/neoc.h"
-#include "neoc/crypto/base58.h"
+#include "neoc/utils/neoc_base58.h"
 #include "neoc/crypto/hash256.h"
 
 // Test data structure for valid encoding/decoding pairs

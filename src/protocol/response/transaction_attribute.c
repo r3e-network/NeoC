@@ -6,6 +6,8 @@
 #include "neoc/protocol/response/transaction_attribute.h"
 #include "neoc/neoc_error.h"
 #include "neoc/neoc_memory.h"
+#include "neoc/utils/json.h"
+#include "neoc/types/neoc_hash256.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -183,19 +185,26 @@ neoc_transaction_attribute_t* neoc_transaction_attribute_from_json(const char* j
     if (strcmp(type, "HighPriority") == 0) {
         attr = neoc_transaction_attribute_create_high_priority();
     } else if (strcmp(type, "OracleResponse") == 0) {
-        uint64_t id = (uint64_t)neoc_json_get_number(json, "id");
-        neoc_oracle_response_code_t code = (neoc_oracle_response_code_t)neoc_json_get_number(json, "code");
+        double id_val = 0;
+        double code_val = 0;
+        neoc_json_get_number(json, "id", &id_val);
+        neoc_json_get_number(json, "code", &code_val);
+        uint64_t id = (uint64_t)id_val;
+        neoc_oracle_response_code_t code = (neoc_oracle_response_code_t)code_val;
         attr = neoc_transaction_attribute_create_oracle_response(id, code, NULL, 0);
     } else if (strcmp(type, "NotValidBefore") == 0) {
-        uint32_t height = (uint32_t)neoc_json_get_number(json, "height");
+        double height_val = 0;
+        neoc_json_get_number(json, "height", &height_val);
+        uint32_t height = (uint32_t)height_val;
         attr = neoc_transaction_attribute_create_not_valid_before(height);
     } else if (strcmp(type, "Conflicts") == 0) {
         // Need to parse hash from JSON
         const char* hash_str = neoc_json_get_string(json, "hash");
         if (hash_str) {
             neoc_hash256_t hash;
-            neoc_hash256_from_string(hash_str, &hash);
-            attr = neoc_transaction_attribute_create_conflicts(&hash);
+            if (neoc_hash256_from_string(hash_str, &hash) == NEOC_SUCCESS) {
+                attr = neoc_transaction_attribute_create_conflicts(hash.data);
+            }
         }
     }
     

@@ -30,7 +30,9 @@ struct neoc_rpc_block;
 struct neoc_rpc_transaction;
 
 typedef struct neoc_rpc_block neoc_block_t;
+#ifndef NEOC_TRANSACTION_H
 typedef struct neoc_rpc_transaction neoc_transaction_t;
+#endif
 typedef struct neoc_contract_state neoc_contract_state_t;
 typedef struct neoc_invocation_result neoc_invocation_result_t;
 typedef struct neoc_rpc_client_t neoc_rpc_client_t;

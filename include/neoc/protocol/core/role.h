@@ -12,6 +12,7 @@
 #include "neoc/neoc_error.h"
 #include "neoc/neoc_memory.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

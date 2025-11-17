@@ -107,17 +107,21 @@ static integration_test_result_t test_neo_token_operations(void *context) {
 static integration_test_result_t test_gas_token_operations(void *context) {
     integration_test_context_t *ctx = (integration_test_context_t *)context;
     
-    // Create GAS token contract
-    neoc_smart_contract_t *gas_token = NULL;
+    // Create GAS token wrapper
+    neoc_gas_token_t *gas_token = NULL;
     neoc_error_t err = neoc_gas_token_create(&gas_token);
     INTEGRATION_ASSERT_SUCCESS(err);
     INTEGRATION_ASSERT(gas_token != NULL);
     
     // Verify GAS token properties
-    const char *symbol = neoc_gas_token_get_symbol();
+    char *symbol = NULL;
+    err = neoc_gas_token_get_symbol(gas_token, &symbol);
+    INTEGRATION_ASSERT_SUCCESS(err);
     INTEGRATION_ASSERT(strcmp(symbol, "GAS") == 0);
     
-    uint8_t decimals = neoc_gas_token_get_decimals();
+    int decimals = 0;
+    err = neoc_gas_token_get_decimals(gas_token, &decimals);
+    INTEGRATION_ASSERT_SUCCESS(err);
     INTEGRATION_ASSERT_EQ(8, decimals);
     
     if (ctx->verbose) {
@@ -134,32 +138,17 @@ static integration_test_result_t test_gas_token_operations(void *context) {
     INTEGRATION_ASSERT_SUCCESS(err);
     
     // Build GAS transfer script (even though it won't execute without funds)
-    neoc_script_builder_t *builder = NULL;
-    err = neoc_script_builder_create(&builder);
-    INTEGRATION_ASSERT_SUCCESS(err);
-    
-    // Create transfer parameters
-    neoc_contract_parameter_t *params[4];
-    err = neoc_contract_parameter_create_hash160(neoc_account_get_script_hash(sender), &params[0]);
-    INTEGRATION_ASSERT_SUCCESS(err);
-    
-    err = neoc_contract_parameter_create_hash160(neoc_account_get_script_hash(receiver), &params[1]);
-    INTEGRATION_ASSERT_SUCCESS(err);
-    
-    err = neoc_contract_parameter_create_integer(100000000, &params[2]); // 1 GAS
-    INTEGRATION_ASSERT_SUCCESS(err);
-    
-    err = neoc_contract_parameter_create_any(&params[3]); // data parameter
-    INTEGRATION_ASSERT_SUCCESS(err);
-    
-    neoc_hash160_t *gas_script_hash = neoc_smart_contract_get_script_hash(gas_token);
-    err = neoc_script_builder_contract_call(builder, gas_script_hash, "transfer", params, 4);
-    INTEGRATION_ASSERT_SUCCESS(err);
-    
-    // Get script bytes
     uint8_t *script = NULL;
     size_t script_len = 0;
-    err = neoc_script_builder_to_array(builder, &script, &script_len);
+    err = neoc_gas_token_build_transfer_script(
+        gas_token,
+        neoc_account_get_script_hash(sender),
+        neoc_account_get_script_hash(receiver),
+        100000000, // 1 GAS
+        NULL,
+        0,
+        &script,
+        &script_len);
     INTEGRATION_ASSERT_SUCCESS(err);
     INTEGRATION_ASSERT(script_len > 0);
     
@@ -168,14 +157,11 @@ static integration_test_result_t test_gas_token_operations(void *context) {
     }
     
     // Cleanup
-    free(script);
-    for (int i = 0; i < 4; i++) {
-        neoc_contract_parameter_free(params[i]);
-    }
-    neoc_script_builder_free(builder);
+    neoc_free(symbol);
+    neoc_free(script);
     neoc_account_free(sender);
     neoc_account_free(receiver);
-    neoc_smart_contract_free(gas_token);
+    neoc_gas_token_free(gas_token);
     
     return INTEGRATION_TEST_PASS;
 }

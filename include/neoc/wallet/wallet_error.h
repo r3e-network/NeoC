@@ -42,6 +42,23 @@ typedef enum {
 } neoc_wallet_error_type_t;
 
 /**
+ * @brief Structured wallet error payload
+ */
+typedef struct {
+    neoc_wallet_error_type_t type;                       /**< Wallet error classification */
+    char message[NEOC_MAX_ERROR_MESSAGE_LENGTH];         /**< Human-readable message */
+    uint64_t required_amount;                            /**< Optional required amount */
+    uint64_t available_amount;                           /**< Optional available amount */
+    int threshold;                                       /**< Optional multisig threshold */
+    int provided;                                        /**< Optional provided signatures */
+} neoc_wallet_error_t;
+
+neoc_wallet_error_t *neoc_wallet_error_create(void);
+void neoc_wallet_error_free(neoc_wallet_error_t *obj);
+char *neoc_wallet_error_to_json(const neoc_wallet_error_t *obj);
+neoc_wallet_error_t *neoc_wallet_error_from_json(const char *json);
+
+/**
  * @brief Set a wallet-specific error with account state message
  * 
  * Equivalent to Swift WalletError.accountState(_ message:)

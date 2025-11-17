@@ -12,7 +12,7 @@
 #include "neoc/crypto/ecdsa.h"
 #include "neoc/crypto/sha256.h"
 #include "neoc/crypto/ripemd160.h"
-#include "neoc/crypto/base58.h"
+#include "neoc/utils/neoc_base58.h"
 #include "neoc/crypto/base64.h"
 #include "neoc/crypto/aes.h"
 #include "neoc/crypto/scrypt.h"

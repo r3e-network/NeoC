@@ -425,8 +425,8 @@ neoc_error_t neoc_contract_management_get_contract(neoc_contract_management_t *m
 }
 
 neoc_error_t neoc_contract_management_has_contract(neoc_contract_management_t *mgmt,
-                                                    const neoc_hash160_t *hash,
-                                                    bool *exists) {
+                                                   const neoc_hash160_t *hash,
+                                                   bool *exists) {
     if (!mgmt || !hash || !exists) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid parameters");
     }
@@ -442,14 +442,6 @@ neoc_error_t neoc_contract_management_has_contract(neoc_contract_management_t *m
     }
     
     return NEOC_SUCCESS;
-}
-
-void neoc_contract_state_free(neoc_contract_state_t *contract) {
-    if (contract) {
-        // NEF and manifest are embedded structures in contract_response_types.h
-        // So we just free the contract itself
-        neoc_free(contract);
-    }
 }
 
 void neoc_contract_management_free(neoc_contract_management_t *mgmt) {

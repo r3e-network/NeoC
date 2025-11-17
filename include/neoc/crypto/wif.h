@@ -18,6 +18,7 @@ extern "C" {
  * @return NEOC_SUCCESS on success, error code otherwise
  */
 neoc_error_t neoc_private_key_to_wif(const uint8_t *private_key, char **wif);
+neoc_error_t neoc_private_key_to_wif_len(const uint8_t *private_key, size_t key_len, char **wif);
 
 /**
  * @brief Convert WIF to private key

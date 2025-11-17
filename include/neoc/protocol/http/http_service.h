@@ -37,6 +37,7 @@ typedef struct {
     neoc_service_t *base;                   /**< Underlying base service */
     neoc_http_header_t *headers;            /**< Custom headers */
     size_t header_count;                    /**< Number of custom headers */
+    bool owns_base;                         /**< Whether this wrapper owns the base service */
 } neoc_http_service_t;
 
 /**

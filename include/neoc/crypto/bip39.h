@@ -83,18 +83,23 @@ neoc_error_t neoc_bip39_mnemonic_to_entropy(const char *mnemonic,
                                              size_t *entropy_len);
 
 /**
- * @brief Generate seed from mnemonic and passphrase
- * 
- * Uses PBKDF2 with 2048 iterations and HMAC-SHA512
- * 
+ * @brief Generate seed from mnemonic and passphrase into a fixed 64 byte buffer.
+ *
  * @param mnemonic Mnemonic phrase
  * @param passphrase Optional passphrase (can be NULL or empty)
- * @param seed Output seed (64 bytes, caller must allocate)
+ * @param seed Output seed buffer (must be at least 64 bytes)
  * @return NEOC_SUCCESS on success, error code otherwise
  */
+neoc_error_t neoc_bip39_mnemonic_to_seed_buffer(const char *mnemonic,
+                                                const char *passphrase,
+                                                uint8_t seed[64]);
 neoc_error_t neoc_bip39_mnemonic_to_seed(const char *mnemonic,
-                                          const char *passphrase,
-                                          uint8_t seed[64]);
+                                         const char *passphrase,
+                                         uint8_t seed[64]);
+neoc_error_t neoc_bip39_mnemonic_to_seed_len(const char *mnemonic,
+                                             const char *passphrase,
+                                             uint8_t *seed,
+                                             size_t seed_len);
 
 /**
  * @brief Validate a mnemonic phrase
@@ -105,6 +110,23 @@ neoc_error_t neoc_bip39_mnemonic_to_seed(const char *mnemonic,
  */
 bool neoc_bip39_validate_mnemonic(const char *mnemonic,
                                    neoc_bip39_language_t language);
+
+#ifndef NEOC_PP_OVERLOAD
+#define NEOC_PP_CONCAT(a,b) NEOC_PP_CONCAT_IMPL(a,b)
+#define NEOC_PP_CONCAT_IMPL(a,b) a##b
+#define NEOC_PP_NARGS_IMPL(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,N,...) N
+#define NEOC_PP_NARGS(...) NEOC_PP_NARGS_IMPL(__VA_ARGS__,10,9,8,7,6,5,4,3,2,1,0)
+#define NEOC_PP_OVERLOAD(prefix, ...) NEOC_PP_CONCAT(prefix, NEOC_PP_NARGS(__VA_ARGS__))(__VA_ARGS__)
+#endif
+
+#define NEOC_BIP39_MNEMONIC_TO_SEED_3(mnemonic, passphrase, seed) \
+    neoc_bip39_mnemonic_to_seed_buffer((mnemonic), (passphrase), (seed))
+
+#define NEOC_BIP39_MNEMONIC_TO_SEED_4(mnemonic, passphrase, seed, len) \
+    neoc_bip39_mnemonic_to_seed_len((mnemonic), (passphrase), (seed), (len))
+
+#define neoc_bip39_mnemonic_to_seed(...) \
+    NEOC_PP_OVERLOAD(NEOC_BIP39_MNEMONIC_TO_SEED_, __VA_ARGS__)
 
 /**
  * @brief Get word count for a given entropy strength

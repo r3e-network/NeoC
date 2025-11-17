@@ -8,7 +8,7 @@
 #include "neoc/script/opcode.h"
 #include "neoc/script/interop_service.h"
 #include "neoc/crypto/neoc_hash.h"
-#include "neoc/crypto/base58.h"
+#include "neoc/utils/neoc_base58.h"
 #include "neoc/neoc_memory.h"
 #include "neoc/neo_constants.h"
 #include <string.h>
@@ -49,6 +49,35 @@ neoc_error_t neoc_script_create_single_sig_verification(const uint8_t *public_ke
     err = neoc_script_builder_to_array(builder, script, script_len);
     neoc_script_builder_free(builder);
     
+    return err;
+}
+
+neoc_error_t neoc_script_create_single_sig_invocation(const uint8_t *signature,
+                                                      size_t signature_len,
+                                                      uint8_t **script,
+                                                      size_t *script_len) {
+    if (!signature || !script || !script_len) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
+    }
+
+    if (signature_len != 64 && signature_len != 65) {
+        return neoc_error_set(NEOC_ERROR_INVALID_SIZE, "Invalid signature length");
+    }
+
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t err = neoc_script_builder_create(&builder);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    err = neoc_script_builder_push_data(builder, signature, signature_len);
+    if (err != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return err;
+    }
+
+    err = neoc_script_builder_to_array(builder, script, script_len);
+    neoc_script_builder_free(builder);
     return err;
 }
 
@@ -354,19 +383,21 @@ neoc_error_t neoc_script_hash_to_address(const neoc_hash160_t *script_hash,
     // Use version parameter for address encoding (currently using NEO N3 format)
     uint8_t address_version = version ? version : NEOC_ADDRESS_VERSION;
     
-    // Allocate buffer for address and versioned data
-    *address = neoc_malloc(NEOC_MAX_ADDRESS_LENGTH);
+    uint8_t versioned[1 + NEOC_HASH160_SIZE];
+    versioned[0] = address_version;
+    memcpy(versioned + 1, script_hash->data, NEOC_HASH160_SIZE);
+
+    size_t buffer_size = neoc_base58_check_encode_buffer_size(sizeof(versioned));
+    *address = neoc_malloc(buffer_size);
     if (!*address) {
         return NEOC_ERROR_OUT_OF_MEMORY;
     }
     
-    // Create versioned data (version + script hash)
-    uint8_t versioned[21];
-    versioned[0] = address_version;
-    memcpy(versioned + 1, script_hash->data, 20);
-    
     // Encode to Base58Check
-    neoc_error_t err = neoc_base58_check_encode(versioned, 21, *address, NEOC_MAX_ADDRESS_LENGTH);
+    neoc_error_t err = neoc_base58_check_encode(versioned,
+                                                sizeof(versioned),
+                                                *address,
+                                                buffer_size);
     if (err != NEOC_SUCCESS) {
         neoc_free(*address);
         *address = NULL;

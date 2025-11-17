@@ -140,6 +140,18 @@ neoc_error_t neoc_token_balances_from_json(
 );
 
 /**
+ * @brief Serialize token balances to JSON string
+ *
+ * @param token_balances Token balances structure to serialize
+ * @param json_string Output JSON string (caller must free)
+ * @return NEOC_SUCCESS on success, error code on failure
+ */
+neoc_error_t neoc_token_balances_to_json(
+    const neoc_token_balances_t *token_balances,
+    char **json_string
+);
+
+/**
  * @brief Parse token balances response from JSON string
  * 
  * @param json_str JSON string containing response data
@@ -149,6 +161,18 @@ neoc_error_t neoc_token_balances_from_json(
 neoc_error_t neoc_neo_get_token_balances_response_from_json(
     const char *json_str,
     neoc_neo_get_token_balances_response_t **response
+);
+
+/**
+ * @brief Serialize token balances response to JSON string
+ *
+ * @param response Response to serialize
+ * @param json_string Output JSON string (caller must free)
+ * @return NEOC_SUCCESS on success, error code on failure
+ */
+neoc_error_t neoc_neo_get_token_balances_response_to_json(
+    const neoc_neo_get_token_balances_response_t *response,
+    char **json_string
 );
 
 /**

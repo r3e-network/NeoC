@@ -97,7 +97,7 @@ neoc_error_t neoc_contract_param_create_string(const char *value,
     (*param)->type = NEOC_CONTRACT_PARAM_STRING;
     
     if (value) {
-        (*param)->value.string_value = strdup(value);
+        (*param)->value.string_value = neoc_strdup(value);
         if (!(*param)->value.string_value) {
             free(*param);
             *param = NULL;
@@ -257,7 +257,7 @@ neoc_error_t neoc_contract_param_set_name(neoc_contract_parameter_t *param,
     
     // Set new name if provided
     if (name) {
-        param->name = strdup(name);
+        param->name = neoc_strdup(name);
         if (!param->name) {
             return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate name");
         }

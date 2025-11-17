@@ -16,7 +16,7 @@
 #include <neoc/transaction/transaction_builder.h>
 #include <neoc/contract/neo_token.h>
 #include <neoc/contract/gas_token.h>
-#include <neoc/rpc/rpc_client.h>
+#include <neoc/protocol/rpc_client.h>
 #include <neoc/crypto/keys.h>
 #include <neoc/types/uint256.h>
 
@@ -44,6 +44,56 @@ static struct {
     .verbose = 0,
     .testnet = 0
 };
+
+static void print_balance_error(const char *label, neoc_error_t err) {
+    const char *msg = neoc_error_string(err);
+    if (msg && msg[0] != '\0') {
+        printf("%s Balance: Unable to fetch (%s)\n", label, msg);
+    } else {
+        printf("%s Balance: Unable to fetch\n", label);
+    }
+}
+
+static void print_nep17_balances(neoc_rpc_client_t *client,
+                                 const neoc_hash160_t *account_hash) {
+    neoc_nep17_balance_t *balances = NULL;
+    size_t balance_count = 0;
+    neoc_error_t err = neoc_rpc_get_nep17_balances(client, account_hash,
+                                                   &balances, &balance_count);
+    if (err != NEOC_SUCCESS) {
+        print_balance_error("NEO", err);
+        print_balance_error("GAS", err);
+        return;
+    }
+
+    bool neo_printed = false;
+    bool gas_printed = false;
+
+    for (size_t i = 0; i < balance_count; ++i) {
+        if (memcmp(&balances[i].asset_hash, &NEOC_NEO_TOKEN_HASH,
+                   sizeof(neoc_hash160_t)) == 0) {
+            const char *amount_str = balances[i].amount ? balances[i].amount : "0";
+            long long amount = strtoll(amount_str, NULL, 10);
+            printf("NEO Balance: %lld\n", amount);
+            neo_printed = true;
+        } else if (memcmp(&balances[i].asset_hash, &NEOC_GAS_TOKEN_HASH,
+                          sizeof(neoc_hash160_t)) == 0) {
+            const char *amount_str = balances[i].amount ? balances[i].amount : "0";
+            unsigned long long raw_amount = strtoull(amount_str, NULL, 10);
+            printf("GAS Balance: %.8f\n", raw_amount / 100000000.0);
+            gas_printed = true;
+        }
+    }
+
+    if (!neo_printed) {
+        printf("NEO Balance: 0\n");
+    }
+    if (!gas_printed) {
+        printf("GAS Balance: 0.00000000\n");
+    }
+
+    neoc_rpc_nep17_balances_free(balances, balance_count);
+}
 
 /**
  * Print usage information
@@ -304,49 +354,7 @@ int cmd_balance(int argc, char *argv[]) {
         return 1;
     }
     
-    // Check NEO balance
-    neoc_smart_contract_t *neo_token = NULL;
-    err = neoc_neo_token_create(&neo_token);
-    if (err == NEOC_SUCCESS) {
-        int64_t neo_balance = 0;
-        err = neoc_rpc_invoke_function(
-            client,
-            neoc_smart_contract_get_script_hash(neo_token),
-            "balanceOf",
-            account_hash,
-            &neo_balance
-        );
-        
-        if (err == NEOC_SUCCESS) {
-            printf("NEO Balance: %lld\n", (long long)neo_balance);
-        } else {
-            printf("NEO Balance: Unable to fetch\n");
-        }
-        
-        neoc_smart_contract_free(neo_token);
-    }
-    
-    // Check GAS balance
-    neoc_smart_contract_t *gas_token = NULL;
-    err = neoc_gas_token_create(&gas_token);
-    if (err == NEOC_SUCCESS) {
-        int64_t gas_balance = 0;
-        err = neoc_rpc_invoke_function(
-            client,
-            neoc_smart_contract_get_script_hash(gas_token),
-            "balanceOf",
-            account_hash,
-            &gas_balance
-        );
-        
-        if (err == NEOC_SUCCESS) {
-            printf("GAS Balance: %.8f\n", gas_balance / 100000000.0);
-        } else {
-            printf("GAS Balance: Unable to fetch\n");
-        }
-        
-        neoc_smart_contract_free(gas_token);
-    }
+    print_nep17_balances(client, account_hash);
     
     // Clean up
     neoc_hash160_free(account_hash);

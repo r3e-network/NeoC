@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include "neoc/neoc_error.h"
 #include "neoc/wallet/account.h"
+#include "neoc/wallet/nep6_wallet.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,7 +77,8 @@ neoc_error_t neoc_wallet_remove_account(neoc_wallet_t *wallet, const char *addre
  * @param address The address to search for
  * @return Account if found, NULL otherwise (do not free)
  */
-neoc_account_t* neoc_wallet_get_account(const neoc_wallet_t *wallet, const char *address);
+neoc_account_t* neoc_wallet_get_account_by_address(const neoc_wallet_t *wallet, const char *address);
+neoc_account_t* neoc_wallet_get_account_by_index(const neoc_wallet_t *wallet, size_t index);
 
 /**
  * @brief Get wallet name
@@ -84,7 +86,8 @@ neoc_account_t* neoc_wallet_get_account(const neoc_wallet_t *wallet, const char 
  * @param wallet The wallet
  * @return Wallet name (do not free)
  */
-const char* neoc_wallet_get_name(const neoc_wallet_t *wallet);
+const char* neoc_wallet_get_name_ptr(const neoc_wallet_t *wallet);
+neoc_error_t neoc_wallet_get_name_copy(const neoc_wallet_t *wallet, char **name_out);
 
 /**
  * @brief Get account by script hash
@@ -111,7 +114,9 @@ neoc_account_t** neoc_wallet_get_accounts(const neoc_wallet_t *wallet, size_t *c
  * @param wallet The wallet
  * @return Default account or NULL (do not free)
  */
-neoc_account_t* neoc_wallet_get_default_account(const neoc_wallet_t *wallet);
+neoc_account_t* neoc_wallet_get_default_account_ptr(const neoc_wallet_t *wallet);
+neoc_error_t neoc_wallet_get_default_account_out(const neoc_wallet_t *wallet,
+                                                  neoc_account_t **account);
 
 /**
  * @brief Set the default account
@@ -120,7 +125,9 @@ neoc_account_t* neoc_wallet_get_default_account(const neoc_wallet_t *wallet);
  * @param address Address of account to set as default
  * @return NEOC_SUCCESS on success, error code otherwise
  */
-neoc_error_t neoc_wallet_set_default_account(neoc_wallet_t *wallet, const char *address);
+neoc_error_t neoc_wallet_set_default_account_str(neoc_wallet_t *wallet, const char *address);
+neoc_error_t neoc_wallet_set_default_account_hash(neoc_wallet_t *wallet, const neoc_hash160_t *script_hash);
+neoc_error_t neoc_wallet_set_default_account_account(neoc_wallet_t *wallet, const neoc_account_t *account);
 
 /**
  * @brief Create a new account and add to wallet
@@ -172,7 +179,8 @@ bool neoc_wallet_contains(const neoc_wallet_t *wallet, const char *address);
  * @param wallet The wallet
  * @return Number of accounts
  */
-size_t neoc_wallet_get_account_count(const neoc_wallet_t *wallet);
+size_t neoc_wallet_get_account_count_value(const neoc_wallet_t *wallet);
+neoc_error_t neoc_wallet_get_account_count_out(const neoc_wallet_t *wallet, size_t *count_out);
 
 /**
  * @brief Lock all accounts in the wallet
@@ -192,12 +200,45 @@ neoc_error_t neoc_wallet_lock_all(neoc_wallet_t *wallet, const char *passphrase)
  */
 neoc_error_t neoc_wallet_unlock_all(neoc_wallet_t *wallet, const char *passphrase);
 
+neoc_error_t neoc_wallet_to_nep6(const neoc_wallet_t *wallet, neoc_nep6_wallet_t **nep6_wallet);
+neoc_error_t neoc_wallet_from_nep6(const neoc_nep6_wallet_t *nep6_wallet, neoc_wallet_t **wallet);
+
 /**
  * @brief Free a wallet and all its accounts
  * 
  * @param wallet The wallet to free
  */
 void neoc_wallet_free(neoc_wallet_t *wallet);
+
+#define NEOC_WALLET_GET_NAME_1(wallet) neoc_wallet_get_name_ptr(wallet)
+#define NEOC_WALLET_GET_NAME_2(wallet, out) neoc_wallet_get_name_copy(wallet, out)
+#define neoc_wallet_get_name(...) NEOC_PP_OVERLOAD(NEOC_WALLET_GET_NAME_, __VA_ARGS__)
+
+#define NEOC_WALLET_GET_ACCOUNT_COUNT_1(wallet) neoc_wallet_get_account_count_value(wallet)
+#define NEOC_WALLET_GET_ACCOUNT_COUNT_2(wallet, out) neoc_wallet_get_account_count_out(wallet, out)
+#define neoc_wallet_get_account_count(...) NEOC_PP_OVERLOAD(NEOC_WALLET_GET_ACCOUNT_COUNT_, __VA_ARGS__)
+
+#define NEOC_WALLET_GET_DEFAULT_1(wallet) neoc_wallet_get_default_account_ptr(wallet)
+#define NEOC_WALLET_GET_DEFAULT_2(wallet, out) neoc_wallet_get_default_account_out(wallet, out)
+#define neoc_wallet_get_default_account(...) NEOC_PP_OVERLOAD(NEOC_WALLET_GET_DEFAULT_, __VA_ARGS__)
+
+#define neoc_wallet_set_default_account(wallet, key) \
+    (__builtin_types_compatible_p(__typeof__(key), const neoc_hash160_t*) || \
+     __builtin_types_compatible_p(__typeof__(key), neoc_hash160_t*) ? \
+        neoc_wallet_set_default_account_hash((wallet), (const neoc_hash160_t*)(key)) : \
+     __builtin_types_compatible_p(__typeof__(key), const neoc_account_t*) || \
+     __builtin_types_compatible_p(__typeof__(key), neoc_account_t*) ? \
+        neoc_wallet_set_default_account_account((wallet), (const neoc_account_t*)(key)) : \
+        neoc_wallet_set_default_account_str((wallet), (const char*)(key)))
+
+#define neoc_wallet_get_account(wallet, key) \
+    _Generic((key), \
+        size_t: neoc_wallet_get_account_by_index, \
+        unsigned int: neoc_wallet_get_account_by_index, \
+        int: neoc_wallet_get_account_by_index, \
+        const char*: neoc_wallet_get_account_by_address, \
+        char*: neoc_wallet_get_account_by_address \
+    )(wallet, key)
 
 #ifdef __cplusplus
 }

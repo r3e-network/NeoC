@@ -11,10 +11,12 @@
 #include <stddef.h>
 #include "neoc/neoc_error.h"
 #include "neoc/contract/fungible_token.h"
+#include "neoc/protocol/rpc_client.h"
 #include "neoc/crypto/ecpoint.h"
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/types/neoc_types_alt.h"
 #include "neoc/wallet/account.h"
+#include "neoc/transaction/transaction_builder.h"
 
 #ifndef NEOC_PP_OVERLOAD
 #define NEOC_PP_CONCAT(a,b) NEOC_PP_CONCAT_IMPL(a,b)
@@ -69,14 +71,16 @@ neoc_error_t neoc_neo_token_create(neoc_neo_token_t **token);
  * @param public_key Validator public key
  * @return Error code
  */
-neoc_error_t neoc_neo_token_register_candidate(neoc_ec_point_t *public_key);
+neoc_error_t neoc_neo_token_register_candidate(neoc_ec_point_t *public_key,
+                                               neoc_tx_builder_t *tx_builder);
 
 /**
  * Unregister as validator candidate
  * @param public_key Validator public key
  * @return Error code
  */
-neoc_error_t neoc_neo_token_unregister_candidate(neoc_ec_point_t *public_key);
+neoc_error_t neoc_neo_token_unregister_candidate(neoc_ec_point_t *public_key,
+                                                 neoc_tx_builder_t *tx_builder);
 
 /**
  * Vote for validators
@@ -85,7 +89,8 @@ neoc_error_t neoc_neo_token_unregister_candidate(neoc_ec_point_t *public_key);
  * @return Error code
  */
 neoc_error_t neoc_neo_token_vote(neoc_hash160_t *account,
-                                  neoc_ec_point_t *vote_to);
+                                  neoc_ec_point_t *vote_to,
+                                  neoc_tx_builder_t *tx_builder);
 
 /**
  * Get all candidates
@@ -151,6 +156,20 @@ neoc_error_t neoc_neo_token_get_total_supply(neoc_neo_token_t *token, int64_t *t
 neoc_error_t neoc_neo_token_get_balance(neoc_neo_token_t *token,
                                         const neoc_account_t *account,
                                         int64_t *balance);
+neoc_error_t neoc_neo_token_get_script_hash(neoc_hash160_t *script_hash);
+neoc_error_t neoc_neo_token_balance_of(const neoc_hash160_t *address,
+                                        neoc_rpc_client_t *rpc_client,
+                                        uint64_t *balance);
+neoc_error_t neoc_neo_token_transfer(const neoc_hash160_t *from,
+                                      const neoc_hash160_t *to,
+                                      uint64_t amount,
+                                      const uint8_t *data,
+                                      size_t data_len,
+                                      neoc_tx_builder_t *tx_builder);
+neoc_error_t neoc_neo_token_total_supply(void *rpc_client, uint64_t *total_supply);
+neoc_error_t neoc_neo_token_get_account_state(const neoc_hash160_t *address,
+                                              void *rpc_client,
+                                              neoc_neo_account_state_t **state);
 
 #define NEOC_NEO_TOKEN_GET_SYMBOL_0() \
     neoc_neo_token_get_symbol_const()

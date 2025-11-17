@@ -367,7 +367,11 @@ neoc_error_t neoc_nef_file_to_bytes(const neoc_nef_file_t *nef,
     
     // Write compiler (64 bytes)
     uint8_t compiler_buf[64] = {0};
-    strncpy((char*)compiler_buf, nef->header.compiler, 63);
+    size_t compiler_len = strlen(nef->header.compiler);
+    if (compiler_len > sizeof(compiler_buf) - 1) {
+        compiler_len = sizeof(compiler_buf) - 1;
+    }
+    memcpy(compiler_buf, nef->header.compiler, compiler_len);
     err = neoc_binary_writer_write_bytes(writer, compiler_buf, 64);
     if (err != NEOC_SUCCESS) {
         neoc_binary_writer_free(writer);

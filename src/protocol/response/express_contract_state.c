@@ -164,7 +164,8 @@ neoc_express_contract_state_t* neoc_express_contract_state_from_json(const char*
             if (manifest.supported_standards_count > 0) {
                 manifest.supported_standards = neoc_calloc(manifest.supported_standards_count, sizeof(char*));
                 for (size_t i = 0; i < manifest.supported_standards_count; i++) {
-                    const char *standard = neoc_json_array_get_string(standards, i);
+                    neoc_json_t *value = neoc_json_array_get(standards, i);
+                    const char *standard = value ? neoc_json_get_string(value, NULL) : NULL;
                     if (standard) {
                         manifest.supported_standards[i] = strdup(standard);
                     }

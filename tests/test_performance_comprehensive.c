@@ -160,10 +160,10 @@ void test_wif_decoding_performance(void) {
     clock_t start = clock();
     
     for (int i = 0; i < NUM_OPERATIONS; i++) {
-        uint8_t private_key[32];
-        size_t key_len = sizeof(private_key);
-        neoc_error_t err = neoc_wif_to_private_key(TEST_WIF, private_key, &key_len);
+        uint8_t *private_key = NULL;
+        neoc_error_t err = neoc_wif_to_private_key(TEST_WIF, &private_key);
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+        neoc_free(private_key);
     }
     
     clock_t end = clock();
@@ -247,7 +247,7 @@ void test_hex_encoding_performance(void) {
     printf("Testing hex encoding performance\n");
     
     uint8_t test_data[100];
-    for (int i = 0; i < sizeof(test_data); i++) {
+    for (size_t i = 0; i < sizeof(test_data); i++) {
         test_data[i] = i & 0xFF;
     }
     
@@ -255,9 +255,8 @@ void test_hex_encoding_performance(void) {
     clock_t start = clock();
     
     for (int i = 0; i < NUM_OPERATIONS; i++) {
-        char* hex_string;
-        neoc_error_t err = neoc_hex_encode(test_data, sizeof(test_data), &hex_string);
-        TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+        char* hex_string = neoc_hex_encode_alloc(test_data, sizeof(test_data), false, false);
+        TEST_ASSERT_NOT_NULL(hex_string);
         neoc_free(hex_string);
     }
     
@@ -292,7 +291,7 @@ void test_base58_encoding_performance(void) {
     printf("Testing Base58 encoding performance\n");
     
     uint8_t test_data[25]; // Typical address size
-    for (int i = 0; i < sizeof(test_data); i++) {
+    for (size_t i = 0; i < sizeof(test_data); i++) {
         test_data[i] = i & 0xFF;
     }
     
@@ -300,9 +299,8 @@ void test_base58_encoding_performance(void) {
     clock_t start = clock();
     
     for (int i = 0; i < NUM_OPERATIONS; i++) {
-        char* base58_string;
-        neoc_error_t err = neoc_base58_encode(test_data, sizeof(test_data), &base58_string);
-        TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+        char* base58_string = neoc_base58_encode_alloc(test_data, sizeof(test_data));
+        TEST_ASSERT_NOT_NULL(base58_string);
         neoc_free(base58_string);
     }
     
@@ -324,8 +322,8 @@ void test_base58_decoding_performance(void) {
     
     for (int i = 0; i < NUM_OPERATIONS; i++) {
         uint8_t decoded_data[25];
-        size_t decoded_len = sizeof(decoded_data);
-        neoc_error_t err = neoc_base58_decode(neo_address, decoded_data, &decoded_len);
+        size_t decoded_len = 0;
+        neoc_error_t err = neoc_base58_decode(neo_address, decoded_data, sizeof(decoded_data), &decoded_len);
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     }
     
@@ -340,7 +338,7 @@ void test_base64_performance(void) {
     printf("Testing Base64 encoding/decoding performance\n");
     
     uint8_t test_data[100];
-    for (int i = 0; i < sizeof(test_data); i++) {
+    for (size_t i = 0; i < sizeof(test_data); i++) {
         test_data[i] = i & 0xFF;
     }
     
@@ -349,22 +347,21 @@ void test_base64_performance(void) {
     // Test encoding
     clock_t start = clock();
     for (int i = 0; i < NUM_OPERATIONS; i++) {
-        char* base64_string;
-        neoc_error_t err = neoc_base64_encode(test_data, sizeof(test_data), &base64_string);
-        TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+        char* base64_string = neoc_base64_encode_alloc(test_data, sizeof(test_data));
+        TEST_ASSERT_NOT_NULL(base64_string);
         neoc_free(base64_string);
     }
     clock_t encode_end = clock();
     
     // Test decoding
-    char* test_base64;
-    neoc_base64_encode(test_data, sizeof(test_data), &test_base64);
+    char* test_base64 = neoc_base64_encode_alloc(test_data, sizeof(test_data));
+    TEST_ASSERT_NOT_NULL(test_base64);
     
     clock_t decode_start = clock();
     for (int i = 0; i < NUM_OPERATIONS; i++) {
         uint8_t decoded_data[100];
-        size_t decoded_len = sizeof(decoded_data);
-        neoc_error_t err = neoc_base64_decode(test_base64, decoded_data, &decoded_len);
+        size_t decoded_len = 0;
+        neoc_error_t err = neoc_base64_decode(test_base64, decoded_data, sizeof(decoded_data), &decoded_len);
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     }
     clock_t decode_end = clock();
@@ -461,15 +458,18 @@ void test_nep2_encryption_performance(void) {
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Use fast scrypt parameters for performance testing
-    neoc_scrypt_params_t fast_params;
-    neoc_scrypt_params_init(&fast_params, 256, 1, 1);
+    neoc_nep2_params_t fast_params = {
+        .n = 256,
+        .r = 1,
+        .p = 1
+    };
     
     const int NUM_OPERATIONS = 20; // NEP-2 is slow, fewer operations
     clock_t start = clock();
     
     for (int i = 0; i < NUM_OPERATIONS; i++) {
         char* encrypted;
-        err = neoc_nep2_encrypt("password", key_pair, &fast_params, &encrypted);
+        err = neoc_nep2_encrypt_key_pair(key_pair, "password", &fast_params, &encrypted);
         TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
         neoc_free(encrypted);
     }
@@ -592,12 +592,11 @@ void test_bulk_wallet_operations_performance(void) {
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     for (size_t i = 0; i < account_count; i++) {
-        neoc_account_t* account;
-        err = neoc_wallet_get_account_by_index(wallet, i, &account);
-        if (err == NEOC_SUCCESS) {
-            char* address;
-            err = neoc_account_get_address(account, &address);
-            if (err == NEOC_SUCCESS) {
+        neoc_account_t* account = neoc_wallet_get_account_by_index(wallet, i);
+        if (account) {
+            char* address = NULL;
+            neoc_error_t addr_err = neoc_account_get_address(account, &address);
+            if (addr_err == NEOC_SUCCESS && address) {
                 neoc_free(address);
             }
         }

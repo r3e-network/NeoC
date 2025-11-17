@@ -13,6 +13,7 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -90,6 +91,8 @@ typedef enum {
     NEOC_ERROR_IO = -71,                ///< I/O error
     NEOC_ERROR_TIMEOUT = -72,           ///< Operation timed out
     NEOC_ERROR_CANCELLED = -73,         ///< Operation cancelled
+    NEOC_ERROR_FILE = -74,              ///< File operation failed
+    NEOC_ERROR_FILE_NOT_FOUND = -75,    ///< File not found
     
     /* Internal errors */
     NEOC_ERROR_INTERNAL = -100          ///< Internal SDK error

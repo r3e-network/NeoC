@@ -16,6 +16,7 @@ extern "C" {
 #include "neoc/neoc_error.h"
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/types/neoc_hash256.h"
+#include "neoc/protocol/contract_response_types.h"
 
 /**
  * @brief JSON-RPC client configuration
@@ -94,17 +95,6 @@ typedef struct {
     size_t attribute_count;
     char* attributes_json;          ///< Attributes as JSON string
 } neoc_transaction_info_t;
-
-/**
- * @brief Contract state information
- */
-typedef struct {
-    uint32_t id;
-    uint16_t update_counter;
-    neoc_hash160_t hash;
-    char* nef_json;                 ///< NEF file as JSON
-    char* manifest_json;            ///< Manifest as JSON
-} neoc_contract_state_t;
 
 /**
  * @brief Invocation result

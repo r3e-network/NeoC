@@ -11,9 +11,10 @@
 #include "neoc/protocol/service/neo_c_service.h"
 #include "neoc/neoc_error.h"
 #include "neoc/neoc_memory.h"
+#include "neoc/utils/json.h"
 #include <string.h>
 #include <stdio.h>
-#include <cjson/cJSON.h>
+#include <stdlib.h>
 
 // Global request counter for generating unique request IDs
 static int request_counter = 1;
@@ -101,32 +102,68 @@ char *neoc_request_to_json(const neoc_request_t *request) {
     if (!request || !request->method) {
         return NULL;
     }
-    
-    cJSON *json = cJSON_CreateObject();
+
+    neoc_json_t *json = neoc_json_create_object();
     if (!json) {
         return NULL;
     }
-    
-    cJSON_AddStringToObject(json, "jsonrpc", request->jsonrpc ? request->jsonrpc : "2.0");
-    cJSON_AddStringToObject(json, "method", request->method);
-    cJSON_AddNumberToObject(json, "id", request->id);
-    
-    // Parse params if they exist
+
+    neoc_error_t err = neoc_json_add_string(json, "jsonrpc", request->jsonrpc ? request->jsonrpc : "2.0");
+    if (err != NEOC_SUCCESS) {
+        neoc_json_free(json);
+        return NULL;
+    }
+
+    err = neoc_json_add_string(json, "method", request->method);
+    if (err != NEOC_SUCCESS) {
+        neoc_json_free(json);
+        return NULL;
+    }
+
+    err = neoc_json_add_number(json, "id", (double)request->id);
+    if (err != NEOC_SUCCESS) {
+        neoc_json_free(json);
+        return NULL;
+    }
+
     if (request->params) {
-        cJSON *params_json = cJSON_Parse(request->params);
+        neoc_json_t *params_json = neoc_json_parse(request->params);
         if (params_json) {
-            cJSON_AddItemToObject(json, "params", params_json);
+            err = neoc_json_add_object(json, "params", params_json);
+            if (err != NEOC_SUCCESS) {
+                neoc_json_free(params_json);
+                neoc_json_free(json);
+                return NULL;
+            }
         } else {
-            // If parsing fails, treat as empty array
-            cJSON_AddArrayToObject(json, "params");
+            neoc_json_t *params_array = neoc_json_create_array();
+            if (!params_array) {
+                neoc_json_free(json);
+                return NULL;
+            }
+            err = neoc_json_add_object(json, "params", params_array);
+            if (err != NEOC_SUCCESS) {
+                neoc_json_free(params_array);
+                neoc_json_free(json);
+                return NULL;
+            }
         }
     } else {
-        cJSON_AddArrayToObject(json, "params");
+        neoc_json_t *params_array = neoc_json_create_array();
+        if (!params_array) {
+            neoc_json_free(json);
+            return NULL;
+        }
+        err = neoc_json_add_object(json, "params", params_array);
+        if (err != NEOC_SUCCESS) {
+            neoc_json_free(params_array);
+            neoc_json_free(json);
+            return NULL;
+        }
     }
-    
-    char *json_string = cJSON_Print(json);
-    cJSON_Delete(json);
-    
+
+    char *json_string = neoc_json_to_string(json);
+    neoc_json_free(json);
     return json_string;
 }
 
@@ -140,37 +177,48 @@ neoc_request_t *neoc_request_from_json(const char *json_string, void *service) {
     if (!json_string) {
         return NULL;
     }
-    
-    cJSON *json = cJSON_Parse(json_string);
+
+    neoc_json_t *json = neoc_json_parse(json_string);
     if (!json) {
         return NULL;
     }
-    
-    cJSON *method_json = cJSON_GetObjectItem(json, "method");
-    if (!method_json || !cJSON_IsString(method_json)) {
-        cJSON_Delete(json);
+
+    const char *method = neoc_json_get_string(json, "method");
+    if (!method) {
+        neoc_json_free(json);
         return NULL;
     }
-    
-    cJSON *params_json = cJSON_GetObjectItem(json, "params");
+
+    neoc_json_t *params_json = neoc_json_get_array(json, "params");
+    if (!params_json) {
+        params_json = neoc_json_get_object(json, "params");
+    }
+
     char *params_string = NULL;
     if (params_json) {
-        params_string = cJSON_Print(params_json);
+        params_string = neoc_json_to_string(params_json);
+        if (!params_string) {
+            neoc_json_free(json);
+            return NULL;
+        }
     }
-    
-    neoc_request_t *request = neoc_request_create(method_json->valuestring, params_string, service);
-    
+
+    neoc_request_t *request = neoc_request_create(method, params_string, service);
     if (params_string) {
         neoc_free(params_string);
     }
-    
-    // Override ID if present
-    cJSON *id_json = cJSON_GetObjectItem(json, "id");
-    if (id_json && cJSON_IsNumber(id_json)) {
-        request->id = (int)id_json->valuedouble;
+
+    if (!request) {
+        neoc_json_free(json);
+        return NULL;
     }
-    
-    cJSON_Delete(json);
+
+    int64_t id_value = 0;
+    if (neoc_json_get_int(json, "id", &id_value) == NEOC_SUCCESS) {
+        request->id = (int)id_value;
+    }
+
+    neoc_json_free(json);
     return request;
 }
 

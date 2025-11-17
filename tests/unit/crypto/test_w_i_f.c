@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include "neoc/neoc.h"
 #include "neoc/crypto/wif.h"
-#include "neoc/crypto/base58.h"
+#include "neoc/utils/neoc_base58.h"
 #include "neoc/utils/hex.h"
 
 // Test data

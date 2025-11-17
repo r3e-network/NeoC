@@ -7,6 +7,7 @@
 #include "neoc/neoc_memory.h"
 #include "neoc/script/script_builder.h"
 #include "neoc/script/script_builder_full.h"
+#include "neoc/protocol/rpc_client.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -115,76 +116,35 @@ neoc_error_t neoc_neo_token_get_script_hash(neoc_hash160_t *script_hash) {
 }
 
 neoc_error_t neoc_neo_token_balance_of(const neoc_hash160_t *address,
-                                        void *rpc_client,
+                                        neoc_rpc_client_t *rpc_client,
                                         uint64_t *balance) {
     if (!address || !rpc_client || !balance) {
         return NEOC_ERROR_INVALID_ARGUMENT;
     }
-    
-    // Build script to call balanceOf method
-    neoc_script_builder_t *sb;
-    neoc_error_t err = neoc_script_builder_create(&sb);
+
+    neoc_nep17_balance_t *balances = NULL;
+    size_t balance_count = 0;
+    neoc_error_t err = neoc_rpc_get_nep17_balances(rpc_client,
+                                                   address,
+                                                   &balances,
+                                                   &balance_count);
     if (err != NEOC_SUCCESS) {
         return err;
     }
-    
-    // Push parameters in reverse order (NEO VM uses stack)
-    err = neoc_script_builder_push_hash160(sb, address);
-    if (err != NEOC_SUCCESS) {
-        neoc_script_builder_free(sb);
-        return err;
-    }
-    
-    // Call NEO contract's balanceOf method
-    err = neoc_script_builder_emit_app_call(sb, &NEOC_NEO_TOKEN_HASH, "balanceOf", 1);
-    if (err != NEOC_SUCCESS) {
-        neoc_script_builder_free(sb);
-        return err;
-    }
-    
-    // Get the script bytes for RPC invocation
-    uint8_t *script = NULL;
-    size_t script_len = 0;
-    err = neoc_script_builder_to_array(sb, &script, &script_len);
-    if (err != NEOC_SUCCESS) {
-        neoc_script_builder_free(sb);
-        return err;
-    }
-    
-    // Execute script through RPC client (invokeScript)
-    // RPC client interface for script invocation
-    // This interface must be implemented by the RPC client
-    typedef struct {
-        neoc_error_t (*invoke_script)(void *client, const uint8_t *script, size_t len, void *result);
-    } neoc_rpc_client_t;
-    
-    neoc_rpc_client_t *rpc = (neoc_rpc_client_t *)rpc_client;
-    
-    // Prepare result structure for integer value
-    struct {
-        enum { RESULT_INTEGER, RESULT_BYTEARRAY, RESULT_BOOLEAN } type;
-        union {
-            int64_t integer_value;
-            struct { uint8_t *data; size_t len; } byte_array;
-            bool boolean_value;
-        } value;
-    } result = {0};
-    
-    if (rpc && rpc->invoke_script) {
-        err = rpc->invoke_script(rpc_client, script, script_len, &result);
-        if (err == NEOC_SUCCESS && result.type == RESULT_INTEGER) {
-            *balance = (uint64_t)result.value.integer_value;
-        } else {
-            *balance = 0;
+
+    uint64_t neo_balance = 0;
+    for (size_t i = 0; i < balance_count; ++i) {
+        if (memcmp(&balances[i].asset_hash, &NEOC_NEO_TOKEN_HASH,
+                   sizeof(neoc_hash160_t)) == 0) {
+            const char *amount_str = balances[i].amount ? balances[i].amount : "0";
+            neo_balance = (uint64_t)strtoull(amount_str, NULL, 10);
+            break;
         }
-    } else {
-        *balance = 0;
-        err = NEOC_ERROR_NETWORK;
     }
-    
-    neoc_free(script);
-    neoc_script_builder_free(sb);
-    return err;
+
+    neoc_rpc_nep17_balances_free(balances, balance_count);
+    *balance = neo_balance;
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_neo_token_transfer(const neoc_hash160_t *from,
@@ -192,7 +152,7 @@ neoc_error_t neoc_neo_token_transfer(const neoc_hash160_t *from,
                                       uint64_t amount,
                                       const uint8_t *data,
                                       size_t data_len,
-                                      void *tx_builder) {
+                                      neoc_tx_builder_t *tx_builder) {
     if (!from || !to || !tx_builder) {
         return NEOC_ERROR_INVALID_ARGUMENT;
     }
@@ -254,10 +214,11 @@ neoc_error_t neoc_neo_token_transfer(const neoc_hash160_t *from,
     }
     
     // Add script to transaction builder
-    // Transaction builder should implement add_script method
+    err = neoc_tx_builder_set_script(tx_builder, script, script_len);
+
     neoc_free(script);
     neoc_script_builder_free(sb);
-    return NEOC_ERROR_NOT_IMPLEMENTED;
+    return err;
 }
 
 neoc_error_t neoc_neo_token_total_supply(void *rpc_client,
@@ -269,8 +230,9 @@ neoc_error_t neoc_neo_token_total_supply(void *rpc_client,
     return NEOC_SUCCESS;
 }
 
-neoc_error_t neoc_neo_token_register_candidate(neoc_ec_point_t *public_key) {
-    if (!public_key) {
+neoc_error_t neoc_neo_token_register_candidate(neoc_ec_point_t *public_key,
+                                               neoc_tx_builder_t *tx_builder) {
+    if (!public_key || !tx_builder) {
         return NEOC_ERROR_INVALID_ARGUMENT;
     }
     
@@ -304,14 +266,25 @@ neoc_error_t neoc_neo_token_register_candidate(neoc_ec_point_t *public_key) {
         return err;
     }
     
-    // Execute the built script through a transaction
-    
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    err = neoc_script_builder_to_array(sb, &script, &script_len);
+    if (err != NEOC_SUCCESS) {
+        neoc_script_builder_free(sb);
+        return err;
+    }
+
+    // Attach script to transaction builder
+    err = neoc_tx_builder_set_script(tx_builder, script, script_len);
+
+    neoc_free(script);
     neoc_script_builder_free(sb);
-    return NEOC_SUCCESS;
+    return err;
 }
 
-neoc_error_t neoc_neo_token_unregister_candidate(neoc_ec_point_t *public_key) {
-    if (!public_key) {
+neoc_error_t neoc_neo_token_unregister_candidate(neoc_ec_point_t *public_key,
+                                                 neoc_tx_builder_t *tx_builder) {
+    if (!public_key || !tx_builder) {
         return NEOC_ERROR_INVALID_ARGUMENT;
     }
     
@@ -345,15 +318,25 @@ neoc_error_t neoc_neo_token_unregister_candidate(neoc_ec_point_t *public_key) {
         return err;
     }
     
-    // Execute the built script through a transaction
-    
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    err = neoc_script_builder_to_array(sb, &script, &script_len);
+    if (err != NEOC_SUCCESS) {
+        neoc_script_builder_free(sb);
+        return err;
+    }
+
+    err = neoc_tx_builder_set_script(tx_builder, script, script_len);
+
+    neoc_free(script);
     neoc_script_builder_free(sb);
-    return NEOC_SUCCESS;
+    return err;
 }
 
 neoc_error_t neoc_neo_token_vote(neoc_hash160_t *account,
-                                  neoc_ec_point_t *candidate) {
-    if (!account) {
+                                  neoc_ec_point_t *candidate,
+                                  neoc_tx_builder_t *tx_builder) {
+    if (!account || !tx_builder) {
         return NEOC_ERROR_INVALID_ARGUMENT;
     }
     
@@ -399,10 +382,19 @@ neoc_error_t neoc_neo_token_vote(neoc_hash160_t *account,
         return err;
     }
     
-    // Execute the built script through a transaction
-    
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    err = neoc_script_builder_to_array(sb, &script, &script_len);
+    if (err != NEOC_SUCCESS) {
+        neoc_script_builder_free(sb);
+        return err;
+    }
+
+    err = neoc_tx_builder_set_script(tx_builder, script, script_len);
+
+    neoc_free(script);
     neoc_script_builder_free(sb);
-    return NEOC_SUCCESS;
+    return err;
 }
 
 neoc_error_t neoc_neo_token_get_candidates(neoc_candidate_info_t ***candidates,

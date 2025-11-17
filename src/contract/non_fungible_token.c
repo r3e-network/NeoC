@@ -197,9 +197,6 @@ neoc_error_t neoc_nft_balance_of(neoc_non_fungible_token_t *token,
     neoc_hash160_t script_hash;
     memcpy(&script_hash, token->base.contract_hash, sizeof(neoc_hash160_t));
     
-    neoc_contract_parameter_t *params[1];
-    params[0] = NULL;  // Would create hash160 parameter
-    
     err = neoc_script_builder_emit_app_call(builder, &script_hash, "balanceOf", 1);
     if (err != NEOC_SUCCESS) {
         neoc_script_builder_free(builder);
@@ -258,9 +255,6 @@ neoc_error_t neoc_nft_tokens_of(neoc_non_fungible_token_t *token,
     neoc_hash160_t script_hash;
     memcpy(&script_hash, token->base.contract_hash, sizeof(neoc_hash160_t));
     
-    neoc_contract_parameter_t *params[1];
-    params[0] = NULL;  // Would create hash160 parameter for owner
-    
     err = neoc_script_builder_emit_app_call(builder, &script_hash, "tokensOf", 1);
     if (err != NEOC_SUCCESS) {
         neoc_script_builder_free(builder);
@@ -316,9 +310,6 @@ neoc_error_t neoc_nft_owner_of(neoc_non_fungible_token_t *token,
     
     neoc_hash160_t script_hash;
     memcpy(&script_hash, token->base.contract_hash, sizeof(neoc_hash160_t));
-    
-    neoc_contract_parameter_t *params[1];
-    params[0] = NULL;  // Would create byte array parameter for token_id
     
     err = neoc_script_builder_emit_app_call(builder, &script_hash, "ownerOf", 1);
     if (err != NEOC_SUCCESS) {
@@ -381,11 +372,6 @@ neoc_error_t neoc_nft_transfer(neoc_non_fungible_token_t *token,
     memcpy(&script_hash, token->base.contract_hash, sizeof(neoc_hash160_t));
     
     // Would need to properly build parameters
-    neoc_contract_parameter_t *params[3];
-    params[0] = NULL;  // to address
-    params[1] = NULL;  // token_id
-    params[2] = NULL;  // data
-    
     err = neoc_script_builder_emit_app_call(builder, &script_hash, "transfer", 3);
     if (err != NEOC_SUCCESS) {
         neoc_script_builder_free(builder);
@@ -428,9 +414,6 @@ neoc_error_t neoc_nft_properties(neoc_non_fungible_token_t *token,
     
     neoc_hash160_t script_hash;
     memcpy(&script_hash, token->base.contract_hash, sizeof(neoc_hash160_t));
-    
-    neoc_contract_parameter_t *params[1];
-    params[0] = NULL;  // token_id parameter
     
     err = neoc_script_builder_emit_app_call(builder, &script_hash, "properties", 1);
     if (err != NEOC_SUCCESS) {

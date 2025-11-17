@@ -118,6 +118,11 @@ neoc_error_t neoc_transaction_set_valid_until_block(neoc_transaction_t *transact
 neoc_error_t neoc_transaction_set_script(neoc_transaction_t *transaction,
                                           const uint8_t *script,
                                           size_t script_len);
+neoc_error_t neoc_transaction_get_script(const neoc_transaction_t *transaction,
+                                         uint8_t **script,
+                                         size_t *script_len);
+const uint8_t* neoc_transaction_get_script_ptr(const neoc_transaction_t *transaction,
+                                               size_t *script_len);
 
 /**
  * @brief Add a signer to the transaction

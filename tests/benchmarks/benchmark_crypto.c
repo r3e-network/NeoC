@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include "neoc/neoc.h"
 #include "neoc/crypto/ecdsa.h"
-#include "neoc/crypto/base58.h"
+#include "neoc/utils/neoc_base58.h"
 #include "neoc/crypto/base64.h"
 #include "neoc/crypto/scrypt.h"
 #include "neoc/crypto/ec_key_pair.h"
@@ -161,8 +161,8 @@ static void benchmark_encoding(void) {
     // Benchmark Base58 decoding
     benchmark_start(&bench, "Base58 Decode", ITERATIONS);
     for (int i = 0; i < ITERATIONS; i++) {
-        decoded_len = sizeof(decoded);
-        neoc_error_t err = neoc_base58_decode(encoded, decoded, &decoded_len);
+        decoded_len = 0;
+        neoc_error_t err = neoc_base58_decode(encoded, decoded, sizeof(decoded), &decoded_len);
         assert(err == NEOC_SUCCESS);
     }
     benchmark_end(&bench);

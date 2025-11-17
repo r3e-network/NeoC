@@ -8,6 +8,7 @@
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/transaction/witness_scope.h"
 #include "neoc/serialization/binary_writer.h"
+#include "neoc/witnessrule/witness_rule.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,7 +25,7 @@ typedef struct {
     uint8_t **allowed_groups;         // Allowed groups (when CUSTOM_GROUPS)
     size_t *allowed_groups_sizes;     // Sizes of group public keys
     size_t allowed_groups_count;      // Number of allowed groups
-    void *rules;                       // Witness rules (when WITNESS_RULES)
+    neoc_witness_rule_t **rules;        // Witness rules (when WITNESS_RULES)
     size_t rules_count;                // Number of witness rules
 } neoc_signer_t;
 

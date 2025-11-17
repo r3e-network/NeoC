@@ -8,6 +8,7 @@
 #include "../../../include/neoc/protocol/contract_response_types.h"
 #include "../../../include/neoc/neoc_memory.h"
 #include "../../../include/neoc/crypto/hash.h"
+#include "../../../include/neoc/crypto/sha256.h"
 #include "../../../include/neoc/utils/neoc_base64.h"
 
 // Create an empty contract NEF (matches contract_response_types.h)
@@ -529,8 +530,11 @@ uint32_t neoc_contract_nef_calculate_checksum(const neoc_contract_nef_t* nef) {
     // Calculate checksum using NEF standard algorithm
     // Uses double SHA256 and takes first 4 bytes
     uint8_t hash1[32], hash2[32];
-    neoc_sha256(data, data_size, hash1);
-    neoc_sha256(hash1, 32, hash2);
+    if (neoc_sha256(data, data_size, hash1) != NEOC_SUCCESS ||
+        neoc_sha256(hash1, 32, hash2) != NEOC_SUCCESS) {
+        neoc_free(data);
+        return 0;
+    }
     uint32_t checksum;
     memcpy(&checksum, hash2, 4);
     

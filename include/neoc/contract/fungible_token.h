@@ -12,6 +12,7 @@
 #include "neoc/neoc_error.h"
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/contract/token.h"
+#include "neoc/protocol/rpc_client.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +46,19 @@ neoc_error_t neoc_fungible_token_create(neoc_hash160_t *contract_hash,
 neoc_error_t neoc_fungible_token_balance_of(neoc_fungible_token_t *token,
                                              neoc_hash160_t *account,
                                              int64_t *balance);
+
+/**
+ * Get token balance for account via RPC
+ * @param token The token
+ * @param client RPC client instance
+ * @param account Account hash
+ * @param balance Output balance (token fractions)
+ * @return Error code
+ */
+neoc_error_t neoc_fungible_token_balance_of_rpc(neoc_fungible_token_t *token,
+                                                neoc_rpc_client_t *client,
+                                                const neoc_hash160_t *account,
+                                                uint64_t *balance);
 
 /**
  * Transfer tokens

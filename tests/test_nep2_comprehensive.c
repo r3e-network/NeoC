@@ -7,10 +7,9 @@
 #include <neoc/neoc.h>
 #include <neoc/crypto/nep2.h>
 #include <neoc/crypto/ec_key_pair.h>
-#include <neoc/crypto/scrypt_params.h>
 #include <neoc/utils/neoc_hex.h>
 #include <string.h>
-#include <stdio.h>
+#include <time.h>
 
 // Test constants (from Swift TestProperties)
 static const char* DEFAULT_ACCOUNT_PRIVATE_KEY = "84180ac9d6eb6fba207ea4ef9d2200102d1ebeb4b9c07e2c6a738a42742e27a5";
@@ -29,10 +28,11 @@ void tearDown(void) {
 /* ===== NEP-2 DECRYPTION TESTS ===== */
 
 void test_decrypt_with_default_scrypt_params(void) {
-    printf("Testing NEP-2 decrypt with default scrypt parameters\n");
-    
     neoc_ec_key_pair_t* key_pair;
-    neoc_error_t err = neoc_nep2_decrypt(DEFAULT_ACCOUNT_PASSWORD, DEFAULT_ACCOUNT_ENCRYPTED_PRIVATE_KEY, NULL, &key_pair);
+    neoc_error_t err = neoc_nep2_decrypt_key_pair(DEFAULT_ACCOUNT_ENCRYPTED_PRIVATE_KEY,
+                                                  DEFAULT_ACCOUNT_PASSWORD,
+                                                  NULL,
+                                                  &key_pair);
     
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(key_pair);
@@ -57,13 +57,17 @@ void test_decrypt_with_default_scrypt_params(void) {
 }
 
 void test_decrypt_with_non_default_scrypt_params(void) {
-    printf("Testing NEP-2 decrypt with non-default scrypt parameters\n");
-    
-    neoc_scrypt_params_t params;
-    neoc_scrypt_params_init(&params, 256, 1, 1);
+    neoc_nep2_params_t params = {
+        .n = 256,
+        .r = 1,
+        .p = 1,
+    };
     
     neoc_ec_key_pair_t* key_pair;
-    neoc_error_t err = neoc_nep2_decrypt(DEFAULT_ACCOUNT_PASSWORD, NON_DEFAULT_SCRYPT_ENCRYPTED, &params, &key_pair);
+    neoc_error_t err = neoc_nep2_decrypt_key_pair(NON_DEFAULT_SCRYPT_ENCRYPTED,
+                                                  DEFAULT_ACCOUNT_PASSWORD,
+                                                  &params,
+                                                  &key_pair);
     
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(key_pair);
@@ -88,8 +92,6 @@ void test_decrypt_with_non_default_scrypt_params(void) {
 /* ===== NEP-2 ENCRYPTION TESTS ===== */
 
 void test_encrypt_with_default_scrypt_params(void) {
-    printf("Testing NEP-2 encrypt with default scrypt parameters\n");
-    
     // Create key pair from known private key
     uint8_t private_key[32];
     size_t decoded_len;
@@ -102,7 +104,7 @@ void test_encrypt_with_default_scrypt_params(void) {
     
     // Encrypt with default parameters
     char* encrypted;
-    err = neoc_nep2_encrypt(DEFAULT_ACCOUNT_PASSWORD, key_pair, NULL, &encrypted);
+    err = neoc_nep2_encrypt_key_pair(key_pair, DEFAULT_ACCOUNT_PASSWORD, NULL, &encrypted);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(encrypted);
     
@@ -114,10 +116,11 @@ void test_encrypt_with_default_scrypt_params(void) {
 }
 
 void test_encrypt_with_non_default_scrypt_params(void) {
-    printf("Testing NEP-2 encrypt with non-default scrypt parameters\n");
-    
-    neoc_scrypt_params_t params;
-    neoc_scrypt_params_init(&params, 256, 1, 1);
+    neoc_nep2_params_t params = {
+        .n = 256,
+        .r = 1,
+        .p = 1,
+    };
     
     // Create key pair from known private key
     uint8_t private_key[32];
@@ -131,7 +134,7 @@ void test_encrypt_with_non_default_scrypt_params(void) {
     
     // Encrypt with non-default parameters
     char* encrypted;
-    err = neoc_nep2_encrypt(DEFAULT_ACCOUNT_PASSWORD, key_pair, &params, &encrypted);
+    err = neoc_nep2_encrypt_key_pair(key_pair, DEFAULT_ACCOUNT_PASSWORD, &params, &encrypted);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(encrypted);
     
@@ -145,8 +148,6 @@ void test_encrypt_with_non_default_scrypt_params(void) {
 /* ===== NEP-2 ROUND-TRIP TESTS ===== */
 
 void test_encrypt_decrypt_round_trip(void) {
-    printf("Testing NEP-2 encrypt-decrypt round trip\n");
-    
     // Create random key pair
     neoc_ec_key_pair_t* original_key_pair;
     neoc_error_t err = neoc_ec_key_pair_create_random(&original_key_pair);
@@ -161,13 +162,13 @@ void test_encrypt_decrypt_round_trip(void) {
     // Encrypt
     const char* password = "test_password_123";
     char* encrypted;
-    err = neoc_nep2_encrypt(password, original_key_pair, NULL, &encrypted);
+    err = neoc_nep2_encrypt_key_pair(original_key_pair, password, NULL, &encrypted);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(encrypted);
     
     // Decrypt
     neoc_ec_key_pair_t* decrypted_key_pair;
-    err = neoc_nep2_decrypt(password, encrypted, NULL, &decrypted_key_pair);
+    err = neoc_nep2_decrypt_key_pair(encrypted, password, NULL, &decrypted_key_pair);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_NOT_NULL(decrypted_key_pair);
     
@@ -188,18 +189,17 @@ void test_encrypt_decrypt_round_trip(void) {
 /* ===== NEP-2 ERROR HANDLING TESTS ===== */
 
 void test_decrypt_with_invalid_password(void) {
-    printf("Testing NEP-2 decrypt with invalid password\n");
-    
     neoc_ec_key_pair_t* key_pair;
-    neoc_error_t err = neoc_nep2_decrypt("wrong_password", DEFAULT_ACCOUNT_ENCRYPTED_PRIVATE_KEY, NULL, &key_pair);
+    neoc_error_t err = neoc_nep2_decrypt_key_pair(DEFAULT_ACCOUNT_ENCRYPTED_PRIVATE_KEY,
+                                                  "wrong_password",
+                                                  NULL,
+                                                  &key_pair);
     
     // Should fail with authentication error
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
 }
 
 void test_decrypt_with_malformed_encrypted_key(void) {
-    printf("Testing NEP-2 decrypt with malformed encrypted key\n");
-    
     const char* malformed_keys[] = {
         "6PYM7jHL4GmS8Aw2iEFpuaHTCUKjhT4mwVqdoozGU6sUE25BjV4ePXDdL", // too short
         "6PYM7jHL4GmS8Aw2iEFpuaHTCUKjhT4mwVqdoozGU6sUE25BjV4ePXDdLzz", // too long
@@ -211,29 +211,34 @@ void test_decrypt_with_malformed_encrypted_key(void) {
     size_t num_keys = sizeof(malformed_keys) / sizeof(malformed_keys[0]);
     for (size_t i = 0; i < num_keys; i++) {
         neoc_ec_key_pair_t* key_pair;
-        neoc_error_t err = neoc_nep2_decrypt(DEFAULT_ACCOUNT_PASSWORD, malformed_keys[i], NULL, &key_pair);
+        neoc_error_t err = neoc_nep2_decrypt_key_pair(malformed_keys[i],
+                                                      DEFAULT_ACCOUNT_PASSWORD,
+                                                      NULL,
+                                                      &key_pair);
         TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     }
 }
 
 void test_encrypt_with_null_inputs(void) {
-    printf("Testing NEP-2 encrypt with null inputs\n");
-    
     neoc_ec_key_pair_t* key_pair;
-    neoc_ec_key_pair_create_random(&key_pair);
-    
-    char* encrypted;
-    
+    neoc_error_t err = neoc_ec_key_pair_create_random(&key_pair);
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+
+    char *encrypted = NULL;
+
     // Null password
-    neoc_error_t err = neoc_nep2_encrypt(NULL, key_pair, NULL, &encrypted);
+    err = neoc_nep2_encrypt_key_pair(key_pair, NULL, NULL, &encrypted);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    TEST_ASSERT_NULL(encrypted);
     
     // Null key pair
-    err = neoc_nep2_encrypt("password", NULL, NULL, &encrypted);
+    encrypted = NULL;
+    err = neoc_nep2_encrypt_key_pair(NULL, "password", NULL, &encrypted);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+    TEST_ASSERT_NULL(encrypted);
     
     // Null output
-    err = neoc_nep2_encrypt("password", key_pair, NULL, NULL);
+    err = neoc_nep2_encrypt_key_pair(key_pair, "password", NULL, NULL);
     TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
     
     neoc_ec_key_pair_free(key_pair);
@@ -242,10 +247,9 @@ void test_encrypt_with_null_inputs(void) {
 /* ===== NEP-2 SCRYPT PARAMETER VALIDATION TESTS ===== */
 
 void test_various_scrypt_parameters(void) {
-    printf("Testing NEP-2 with various scrypt parameters\n");
-    
     neoc_ec_key_pair_t* original_key_pair;
-    neoc_ec_key_pair_create_random(&original_key_pair);
+    neoc_error_t err = neoc_ec_key_pair_create_random(&original_key_pair);
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Test different parameter combinations
     struct {
@@ -258,16 +262,19 @@ void test_various_scrypt_parameters(void) {
         {0, 8, 8, false},       // Invalid N
         {16384, 0, 8, false},   // Invalid r
         {16384, 8, 0, false},   // Invalid p
-        {1, 1, 1, true},        // Minimal valid
+        {2, 1, 1, true},        // Minimal valid
     };
     
     size_t num_cases = sizeof(test_cases) / sizeof(test_cases[0]);
     for (size_t i = 0; i < num_cases; i++) {
-        neoc_scrypt_params_t params;
-        neoc_scrypt_params_init(&params, test_cases[i].n, test_cases[i].r, test_cases[i].p);
-        
-        char* encrypted;
-        neoc_error_t err = neoc_nep2_encrypt("password", original_key_pair, &params, &encrypted);
+        neoc_nep2_params_t params = {
+            .n = test_cases[i].n,
+            .r = test_cases[i].r,
+            .p = test_cases[i].p,
+        };
+
+        char *encrypted = NULL;
+        err = neoc_nep2_encrypt_key_pair(original_key_pair, "password", &params, &encrypted);
         
         if (test_cases[i].should_succeed) {
             TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
@@ -275,13 +282,14 @@ void test_various_scrypt_parameters(void) {
             
             // Verify we can decrypt
             neoc_ec_key_pair_t* decrypted_key_pair;
-            err = neoc_nep2_decrypt("password", encrypted, &params, &decrypted_key_pair);
+            err = neoc_nep2_decrypt_key_pair(encrypted, "password", &params, &decrypted_key_pair);
             TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
             
             neoc_ec_key_pair_free(decrypted_key_pair);
             neoc_free(encrypted);
         } else {
             TEST_ASSERT_TRUE(err != NEOC_SUCCESS);
+            TEST_ASSERT_NULL(encrypted);
         }
     }
     
@@ -291,36 +299,35 @@ void test_various_scrypt_parameters(void) {
 /* ===== NEP-2 PERFORMANCE TESTS ===== */
 
 void test_encrypt_decrypt_performance(void) {
-    printf("Testing NEP-2 encrypt/decrypt performance\n");
-    
     neoc_ec_key_pair_t* key_pair;
-    neoc_ec_key_pair_create_random(&key_pair);
+    neoc_error_t err = neoc_ec_key_pair_create_random(&key_pair);
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Test with fast scrypt parameters
-    neoc_scrypt_params_t fast_params;
-    neoc_scrypt_params_init(&fast_params, 256, 1, 1);
+    neoc_nep2_params_t fast_params = {
+        .n = 256,
+        .r = 1,
+        .p = 1,
+    };
     
     clock_t start = clock();
     
     // Encrypt
     char* encrypted;
-    neoc_error_t err = neoc_nep2_encrypt("password", key_pair, &fast_params, &encrypted);
+    err = neoc_nep2_encrypt_key_pair(key_pair, "password", &fast_params, &encrypted);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     clock_t encrypt_time = clock();
     
     // Decrypt
     neoc_ec_key_pair_t* decrypted_key_pair;
-    err = neoc_nep2_decrypt("password", encrypted, &fast_params, &decrypted_key_pair);
+    err = neoc_nep2_decrypt_key_pair(encrypted, "password", &fast_params, &decrypted_key_pair);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     clock_t decrypt_time = clock();
     
     double encrypt_seconds = ((double)(encrypt_time - start)) / CLOCKS_PER_SEC;
     double decrypt_seconds = ((double)(decrypt_time - encrypt_time)) / CLOCKS_PER_SEC;
-    
-    printf("  Encrypt time: %.3f seconds\n", encrypt_seconds);
-    printf("  Decrypt time: %.3f seconds\n", decrypt_seconds);
     
     // Performance assertions (generous bounds for CI)
     TEST_ASSERT_TRUE(encrypt_seconds < 5.0);  // Should be much faster with low params
@@ -335,8 +342,6 @@ void test_encrypt_decrypt_performance(void) {
 
 int main(void) {
     UNITY_BEGIN();
-    
-    printf("\n=== COMPREHENSIVE NEP-2 TESTS ===\n");
     
     // Decryption tests
     RUN_TEST(test_decrypt_with_default_scrypt_params);

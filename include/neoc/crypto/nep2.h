@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "neoc/neoc_error.h"
+#include "neoc/crypto/ec_key_pair.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,6 +86,16 @@ bool neoc_nep2_verify_password(const char *encrypted_key,
  * @return true if valid NEP-2 format, false otherwise
  */
 bool neoc_nep2_is_valid_format(const char *encrypted_key);
+
+neoc_error_t neoc_nep2_decrypt_key_pair(const char *encrypted_key,
+                                        const char *password,
+                                        const neoc_nep2_params_t *params,
+                                        neoc_ec_key_pair_t **key_pair);
+
+neoc_error_t neoc_nep2_encrypt_key_pair(const neoc_ec_key_pair_t *key_pair,
+                                        const char *password,
+                                        const neoc_nep2_params_t *params,
+                                        char **encrypted_key);
 
 #ifdef __cplusplus
 }

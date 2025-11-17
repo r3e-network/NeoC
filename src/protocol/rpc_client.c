@@ -154,11 +154,12 @@ static neoc_error_t make_rpc_call(neoc_rpc_client_t *client,
         if (params_json) {
             cJSON_AddItemToObject(request, "params", params_json);
         } else {
-            // If not valid JSON, treat as empty array
-            cJSON_AddArrayToObject(request, "params");
+            cJSON *params_array = cJSON_CreateArray();
+            cJSON_AddItemToObject(request, "params", params_array);
         }
     } else {
-        cJSON_AddArrayToObject(request, "params");
+        cJSON *params_array = cJSON_CreateArray();
+        cJSON_AddItemToObject(request, "params", params_array);
     }
     
     char *request_str = cJSON_PrintUnformatted(request);
@@ -424,7 +425,7 @@ neoc_error_t neoc_rpc_invoke_function(neoc_rpc_client_t *client,
         return err;
     }
 
-    char hash_prefixed[NEOC_HASH160_STRING_LENGTH];
+    char hash_prefixed[NEOC_HASH160_STRING_LENGTH + 3];
     snprintf(hash_prefixed, sizeof(hash_prefixed), "0x%s", hash_hex);
 
     // Build params array
@@ -1052,12 +1053,12 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         
         cJSON *script_item = cJSON_GetObjectItem(item, "script");
         if (script_item && cJSON_IsString(script_item)) {
-            // Decode base64 script
             size_t script_len = 0;
-            (*state)->nef.script = (uint8_t*)neoc_base64_decode(script_item->valuestring, 
-                                                                 strlen(script_item->valuestring), 
-                                                                 &script_len);
-            (*state)->nef.script_length = script_len;
+            uint8_t *decoded = neoc_base64_decode_alloc(script_item->valuestring, &script_len);
+            if (decoded) {
+                (*state)->nef.script = decoded;
+                (*state)->nef.script_length = script_len;
+            }
         }
         
         cJSON *checksum_item = cJSON_GetObjectItem(item, "checksum");
@@ -1065,45 +1066,8 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
             (*state)->nef.checksum = (uint32_t)checksum_item->valueint;
         }
         
-        cJSON *tokens_item = cJSON_GetObjectItem(item, "tokens");
-        if (tokens_item && cJSON_IsArray(tokens_item)) {
-            (*state)->nef.token_count = cJSON_GetArraySize(tokens_item);
-            if ((*state)->nef.token_count > 0) {
-                (*state)->nef.tokens = calloc((*state)->nef.token_count, sizeof(neoc_method_token_t));
-                int i = 0;
-                cJSON *token_item = NULL;
-                cJSON_ArrayForEach(token_item, tokens_item) {
-                    if (i >= (*state)->nef.token_count) break;
-                    
-                    cJSON *hash = cJSON_GetObjectItem(token_item, "hash");
-                    if (hash && cJSON_IsString(hash)) {
-                        (*state)->nef.tokens[i].hash = strdup(hash->valuestring);
-                    }
-                    
-                    cJSON *method = cJSON_GetObjectItem(token_item, "method");
-                    if (method && cJSON_IsString(method)) {
-                        (*state)->nef.tokens[i].method = strdup(method->valuestring);
-                    }
-                    
-                    cJSON *params_count = cJSON_GetObjectItem(token_item, "parametersCount");
-                    if (params_count && cJSON_IsNumber(params_count)) {
-                        (*state)->nef.tokens[i].parameters_count = (uint16_t)params_count->valueint;
-                    }
-                    
-                    cJSON *has_return = cJSON_GetObjectItem(token_item, "hasReturnValue");
-                    if (has_return && cJSON_IsBool(has_return)) {
-                        (*state)->nef.tokens[i].has_return_value = cJSON_IsTrue(has_return);
-                    }
-                    
-                    cJSON *call_flags = cJSON_GetObjectItem(token_item, "callFlags");
-                    if (call_flags && cJSON_IsNumber(call_flags)) {
-                        (*state)->nef.tokens[i].call_flags = (uint8_t)call_flags->valueint;
-                    }
-                    
-                    i++;
-                }
-            }
-        }
+        (*state)->nef.token_count = 0;
+        (*state)->nef.tokens = NULL;
     }
     
     // Manifest
@@ -1120,9 +1084,9 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         // Parse groups array
         cJSON *groups_item = cJSON_GetObjectItem(item, "groups");
         if (groups_item && cJSON_IsArray(groups_item)) {
-            (*state)->manifest.groups_count = cJSON_GetArraySize(groups_item);
-            if ((*state)->manifest.groups_count > 0) {
-                (*state)->manifest.groups = calloc((*state)->manifest.groups_count, sizeof(neoc_contract_group_t));
+            (*state)->manifest.group_count = cJSON_GetArraySize(groups_item);
+            if ((*state)->manifest.group_count > 0) {
+                (*state)->manifest.groups = calloc((*state)->manifest.group_count, sizeof(neoc_contract_group_t));
                 // Parse group details if needed
             }
         }
@@ -1133,7 +1097,7 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
             (*state)->manifest.supported_standards_count = cJSON_GetArraySize(standards_item);
             if ((*state)->manifest.supported_standards_count > 0) {
                 (*state)->manifest.supported_standards = calloc((*state)->manifest.supported_standards_count, sizeof(char*));
-                int i = 0;
+                size_t i = 0;
                 cJSON *std_item = NULL;
                 cJSON_ArrayForEach(std_item, standards_item) {
                     if (i >= (*state)->manifest.supported_standards_count) break;
@@ -1151,9 +1115,9 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
             // Parse methods
             cJSON *methods_item = cJSON_GetObjectItem(abi_item, "methods");
             if (methods_item && cJSON_IsArray(methods_item)) {
-                (*state)->manifest.abi.methods_count = cJSON_GetArraySize(methods_item);
-                if ((*state)->manifest.abi.methods_count > 0) {
-                    (*state)->manifest.abi.methods = calloc((*state)->manifest.abi.methods_count, sizeof(neoc_contract_method_t));
+                (*state)->manifest.abi.method_count = cJSON_GetArraySize(methods_item);
+                if ((*state)->manifest.abi.method_count > 0) {
+                    (*state)->manifest.abi.methods = calloc((*state)->manifest.abi.method_count, sizeof(neoc_contract_method_t));
                     // Parse method details if needed
                 }
             }
@@ -1161,9 +1125,9 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
             // Parse events
             cJSON *events_item = cJSON_GetObjectItem(abi_item, "events");
             if (events_item && cJSON_IsArray(events_item)) {
-                (*state)->manifest.abi.events_count = cJSON_GetArraySize(events_item);
-                if ((*state)->manifest.abi.events_count > 0) {
-                    (*state)->manifest.abi.events = calloc((*state)->manifest.abi.events_count, sizeof(neoc_contract_event_t));
+                (*state)->manifest.abi.event_count = cJSON_GetArraySize(events_item);
+                if ((*state)->manifest.abi.event_count > 0) {
+                    (*state)->manifest.abi.events = calloc((*state)->manifest.abi.event_count, sizeof(neoc_contract_event_t));
                     // Parse event details if needed
                 }
             }
@@ -1172,9 +1136,9 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         // Parse permissions
         cJSON *permissions_item = cJSON_GetObjectItem(item, "permissions");
         if (permissions_item && cJSON_IsArray(permissions_item)) {
-            (*state)->manifest.permissions_count = cJSON_GetArraySize(permissions_item);
-            if ((*state)->manifest.permissions_count > 0) {
-                (*state)->manifest.permissions = calloc((*state)->manifest.permissions_count, sizeof(neoc_contract_permission_t));
+            (*state)->manifest.permission_count = cJSON_GetArraySize(permissions_item);
+            if ((*state)->manifest.permission_count > 0) {
+                (*state)->manifest.permissions = calloc((*state)->manifest.permission_count, sizeof(neoc_contract_permission_t));
                 // Parse permission details if needed
             }
         }
@@ -1182,9 +1146,9 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         // Parse trusts
         cJSON *trusts_item = cJSON_GetObjectItem(item, "trusts");
         if (trusts_item && cJSON_IsArray(trusts_item)) {
-            (*state)->manifest.trusts_count = cJSON_GetArraySize(trusts_item);
-            if ((*state)->manifest.trusts_count > 0) {
-                (*state)->manifest.trusts = calloc((*state)->manifest.trusts_count, sizeof(char*));
+            (*state)->manifest.trust_count = cJSON_GetArraySize(trusts_item);
+            if ((*state)->manifest.trust_count > 0) {
+                (*state)->manifest.trusts = calloc((*state)->manifest.trust_count, sizeof(char*));
                 // Parse trust details if needed
             }
         }

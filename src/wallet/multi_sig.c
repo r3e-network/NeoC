@@ -41,10 +41,6 @@ neoc_error_t neoc_multi_sig_create(uint8_t threshold,
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid threshold");
     }
     
-    if (key_count > 255) {  // Changed from 1024 to 255 to fix comparison warning
-        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Too many public keys");
-    }
-    
     // Allocate account structure
     *account = neoc_calloc(1, sizeof(neoc_multi_sig_account_t));
     if (!*account) {

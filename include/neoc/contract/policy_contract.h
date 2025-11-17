@@ -60,6 +60,18 @@ neoc_error_t neoc_policy_get_storage_price(neoc_policy_contract_t *policy,
                                             uint32_t *price);
 
 /**
+ * @brief Set fee per byte
+ *
+ * Updates the cached fee per byte value (committee operation placeholder).
+ *
+ * @param policy Policy contract instance
+ * @param fee New fee per byte
+ * @return NEOC_SUCCESS on success, error code otherwise
+ */
+neoc_error_t neoc_policy_set_fee_per_byte(neoc_policy_contract_t *policy,
+                                           uint64_t fee);
+
+/**
  * @brief Check if account is blocked
  * 
  * @param policy Policy contract instance

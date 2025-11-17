@@ -31,9 +31,9 @@ static int hmac_sha512(const uint8_t *key, size_t key_len,
     return (out_len == 64) ? 0 : -1;
 }
 
-neoc_error_t neoc_bip32_from_seed(const uint8_t *seed,
-                                   size_t seed_len,
-                                   neoc_bip32_key_t *master_key) {
+neoc_error_t neoc_bip32_from_seed_raw(const uint8_t *seed,
+                                      size_t seed_len,
+                                      neoc_bip32_key_t *master_key) {
     if (!seed || !master_key) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
@@ -65,6 +65,24 @@ neoc_error_t neoc_bip32_from_seed(const uint8_t *seed,
     neoc_secure_memzero(hmac_result, sizeof(hmac_result));
     
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_bip32_from_seed_alloc(const uint8_t *seed,
+                                        size_t seed_len,
+                                        neoc_bip32_key_t **master_key) {
+    if (!master_key) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid master key pointer");
+    }
+    *master_key = neoc_calloc(1, sizeof(neoc_bip32_key_t));
+    if (!*master_key) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate master key");
+    }
+    neoc_error_t err = neoc_bip32_from_seed_raw(seed, seed_len, *master_key);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(*master_key);
+        *master_key = NULL;
+    }
+    return err;
 }
 
 neoc_error_t neoc_bip32_derive_child(const neoc_bip32_key_t *parent,
@@ -275,9 +293,9 @@ neoc_error_t neoc_bip32_derive_child(const neoc_bip32_key_t *parent,
     return NEOC_SUCCESS;
 }
 
-neoc_error_t neoc_bip32_derive_path(const neoc_bip32_key_t *master,
-                                     const char *path,
-                                     neoc_bip32_key_t *derived) {
+neoc_error_t neoc_bip32_derive_path_raw(const neoc_bip32_key_t *master,
+                                        const char *path,
+                                        neoc_bip32_key_t *derived) {
     if (!master || !path || !derived) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
@@ -315,6 +333,25 @@ neoc_error_t neoc_bip32_derive_path_indices(const neoc_bip32_key_t *master,
     
     memcpy(derived, &current, sizeof(neoc_bip32_key_t));
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_bip32_derive_path_indices_alloc(const neoc_bip32_key_t *master,
+                                                  const uint32_t *indices,
+                                                  size_t indices_count,
+                                                  neoc_bip32_key_t **derived) {
+    if (!derived) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid derived pointer");
+    }
+    *derived = neoc_calloc(1, sizeof(neoc_bip32_key_t));
+    if (!*derived) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate derived key");
+    }
+    neoc_error_t err = neoc_bip32_derive_path_indices(master, indices, indices_count, *derived);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(*derived);
+        *derived = NULL;
+    }
+    return err;
 }
 
 neoc_error_t neoc_bip32_get_public_key(const neoc_bip32_key_t *key,
@@ -368,8 +405,8 @@ neoc_error_t neoc_bip32_get_public_key(const neoc_bip32_key_t *key,
     return NEOC_SUCCESS;
 }
 
-neoc_error_t neoc_bip32_to_ec_key_pair(const neoc_bip32_key_t *bip32_key,
-                                        neoc_ec_key_pair_t *ec_key) {
+neoc_error_t neoc_bip32_to_ec_key_pair_raw(const neoc_bip32_key_t *bip32_key,
+                                           neoc_ec_key_pair_t *ec_key) {
     if (!bip32_key || !ec_key) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
@@ -379,8 +416,28 @@ neoc_error_t neoc_bip32_to_ec_key_pair(const neoc_bip32_key_t *bip32_key,
                             "Cannot create EC key pair from public key only");
     }
     
-    // Create EC key pair from private key (skip the 0x00 prefix)
-    return neoc_ec_key_pair_from_private_key(&bip32_key->key[1], 32, &ec_key);
+    neoc_ec_key_pair_t *tmp = NULL;
+    neoc_error_t err = neoc_ec_key_pair_from_private_key(&bip32_key->key[1], 32, &tmp);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    *ec_key = *tmp;
+    neoc_free(tmp);
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_bip32_to_ec_key_pair_alloc(const neoc_bip32_key_t *bip32_key,
+                                             neoc_ec_key_pair_t **ec_key) {
+    if (!ec_key) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid EC key pointer");
+    }
+    *ec_key = NULL;
+    neoc_error_t err = neoc_ec_key_pair_from_private_key(&bip32_key->key[1], 32, ec_key);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_bip32_get_fingerprint(const neoc_bip32_key_t *key,
@@ -495,6 +552,14 @@ neoc_error_t neoc_bip32_parse_path(const char *path,
     }
     
     return NEOC_SUCCESS;
+}
+
+void neoc_bip32_key_free(neoc_bip32_key_t *key) {
+    if (!key) {
+        return;
+    }
+    neoc_secure_memzero(key, sizeof(neoc_bip32_key_t));
+    neoc_free(key);
 }
 
 neoc_error_t neoc_bip32_get_neo_path(uint32_t account,

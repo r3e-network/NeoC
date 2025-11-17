@@ -1,31 +1,75 @@
 /**
  * @file witness_action.c
- * @brief WitnessAction implementation
- * 
- * Based on Swift source: protocol/core/witnessrule/WitnessAction.swift
+ * @brief Implementation of witness action helpers.
+ *
+ * Mirrors NeoSwift's WitnessAction enum semantics.
  */
 
-#include "neoc/neoc.h"
+#include "neoc/protocol/core/witnessrule/witness_action.h"
+#include "neoc/neoc_error.h"
 #include <string.h>
 
-/**
- * @brief Convert witnessaction to string
- */
-const char *neoc_witnessaction_to_string(neoc_witnessaction_t value) {
-    switch (value) {
-        case NEOC_WITNESSACTION_DENY: return "DENY";
-        case NEOC_WITNESSACTION_ALLOW: return "ALLOW";
-        default: return "UNKNOWN";
+static const char *NEOC_WITNESS_ACTION_JSON_DENY = "Deny";
+static const char *NEOC_WITNESS_ACTION_JSON_ALLOW = "Allow";
+
+uint8_t neoc_witness_action_get_byte(neoc_witness_action_t action) {
+    return (action == NEOC_WITNESS_ACTION_ALLOW) ? 1u : 0u;
+}
+
+neoc_error_t neoc_witness_action_from_byte(uint8_t byte,
+                                           neoc_witness_action_t *action) {
+    if (!action) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT,
+                              "action pointer is NULL");
+    }
+
+    switch (byte) {
+        case 0:
+            *action = NEOC_WITNESS_ACTION_DENY;
+            return NEOC_SUCCESS;
+        case 1:
+            *action = NEOC_WITNESS_ACTION_ALLOW;
+            return NEOC_SUCCESS;
+        default:
+            return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT,
+                                  "Invalid witness action byte");
     }
 }
 
-/**
- * @brief Convert string to witnessaction
- */
-neoc_witnessaction_t neoc_witnessaction_from_string(const char *str) {
-    if (!str) return -1;
-    
-    if (strcmp(str, "DENY") == 0) return NEOC_WITNESSACTION_DENY;
-    if (strcmp(str, "ALLOW") == 0) return NEOC_WITNESSACTION_ALLOW;
-    return -1;
+const char *neoc_witness_action_to_json_string(neoc_witness_action_t action) {
+    switch (action) {
+        case NEOC_WITNESS_ACTION_DENY:
+            return NEOC_WITNESS_ACTION_JSON_DENY;
+        case NEOC_WITNESS_ACTION_ALLOW:
+            return NEOC_WITNESS_ACTION_JSON_ALLOW;
+        default:
+            return "Unknown";
+    }
+}
+
+neoc_error_t neoc_witness_action_from_json_string(
+    const char *json_str,
+    neoc_witness_action_t *action) {
+    if (!json_str || !action) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT,
+                              "Invalid arguments");
+    }
+
+    if (strcmp(json_str, NEOC_WITNESS_ACTION_JSON_DENY) == 0) {
+        *action = NEOC_WITNESS_ACTION_DENY;
+        return NEOC_SUCCESS;
+    }
+
+    if (strcmp(json_str, NEOC_WITNESS_ACTION_JSON_ALLOW) == 0) {
+        *action = NEOC_WITNESS_ACTION_ALLOW;
+        return NEOC_SUCCESS;
+    }
+
+    return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT,
+                          "Invalid witness action JSON string");
+}
+
+bool neoc_witness_action_is_valid(neoc_witness_action_t action) {
+    return action == NEOC_WITNESS_ACTION_DENY ||
+           action == NEOC_WITNESS_ACTION_ALLOW;
 }

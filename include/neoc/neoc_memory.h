@@ -50,6 +50,13 @@ typedef struct {
     neoc_free_func_t free_func;       ///< Memory deallocation function
 } neoc_allocator_t;
 
+typedef struct {
+    size_t total_allocated;      ///< Total bytes allocated since start
+    size_t current_allocated;    ///< Currently allocated bytes
+    size_t allocation_count;     ///< Number of allocation calls
+    size_t free_count;           ///< Number of free calls
+} neoc_memory_stats_t;
+
 /**
  * @brief Set custom memory allocator functions
  * 
@@ -158,6 +165,18 @@ int neoc_secure_memcmp(const void* a, const void* b, size_t size);
  */
 void neoc_secure_memzero(void* ptr, size_t size);
 
+/**
+ * @brief Get the number of currently outstanding allocations.
+ *
+ * @return Outstanding allocation count.
+ */
+size_t neoc_get_allocation_count(void);
+
+/**
+ * @brief Print a summary of current memory leaks (if any).
+ */
+void neoc_print_memory_leaks(void);
+
 /* Memory debugging support (enabled in debug builds) */
 
 #ifdef NEOC_DEBUG_MEMORY
@@ -192,6 +211,8 @@ neoc_error_t neoc_memory_debug_get_stats(size_t* allocated_bytes, size_t* alloca
 
 #endif /* NEOC_DEBUG_MEMORY */
 
+neoc_error_t neoc_get_memory_stats(neoc_memory_stats_t* memory_stats);
+
 /* Convenience macros */
 
 /**
@@ -221,6 +242,15 @@ neoc_error_t neoc_memory_debug_get_stats(size_t* allocated_bytes, size_t* alloca
         neoc_secure_free((ptr), (size)); \
         (ptr) = NULL; \
     } while(0)
+
+#ifndef HAVE_STRDUP
+#define HAVE_STRDUP 0
+#endif
+
+#if !HAVE_STRDUP
+#define strdup neoc_strdup
+#define strndup neoc_strndup
+#endif
 
 #ifdef __cplusplus
 }

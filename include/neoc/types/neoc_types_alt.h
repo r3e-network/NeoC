@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "neoc/types/neoc_hash160.h"
-#include "neoc/crypto/ec_public_key.h"
+#include "neoc/crypto/ec_key_pair.h"
 #include "neoc/protocol/core/response/neo_account_state.h"
 
 #ifdef __cplusplus

@@ -53,6 +53,30 @@ neoc_error_t neoc_nft_create(neoc_hash160_t *contract_hash,
                               neoc_non_fungible_token_t **token);
 
 /**
+ * Get NFT symbol
+ * @param token The token
+ * @param symbol Output symbol string (caller must free)
+ * @return Error code
+ */
+neoc_error_t neoc_nft_symbol(neoc_non_fungible_token_t *token, char **symbol);
+
+/**
+ * Get NFT decimals
+ * @param token The token
+ * @param decimals Output decimal count
+ * @return Error code
+ */
+neoc_error_t neoc_nft_decimals(neoc_non_fungible_token_t *token, uint8_t *decimals);
+
+/**
+ * Get NFT total supply
+ * @param token The token
+ * @param supply Output total supply
+ * @return Error code
+ */
+neoc_error_t neoc_nft_total_supply(neoc_non_fungible_token_t *token, uint64_t *supply);
+
+/**
  * Get NFT balance for account
  * @param token The token
  * @param account Account hash

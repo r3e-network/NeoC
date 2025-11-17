@@ -13,6 +13,7 @@
 #include <neoc/utils/neoc_hex.h>
 #include <neoc/utils/neoc_base64.h>
 #include <neoc/script/script_builder.h>
+#include <neoc/types/neoc_hash160.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -28,7 +29,6 @@ static const char* DEFAULT_ACCOUNT_PASSWORD = "neo";
 
 // Committee account (multi-sig)
 static const char* COMMITTEE_ACCOUNT_ADDRESS = "NXXazKH39yNFWWZF5MJ8tEN98VYHwzn7g3";
-static const char* COMMITTEE_ACCOUNT_SCRIPT_HASH = "05859de95ccbbd5668e0f055b208273634d4657f";
 static const char* COMMITTEE_ACCOUNT_VERIFICATION_SCRIPT = "110c21033a4d051b04b7fc0230d2b1aaedfd5a84be279a5361a7358db665ad7857787f1b11419ed0dc3a";
 
 void setUp(void) {
@@ -263,7 +263,6 @@ void test_create_multisig_account_from_public_keys(void) {
     err = neoc_account_get_address(account, &address);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     TEST_ASSERT_EQUAL_STRING(COMMITTEE_ACCOUNT_ADDRESS, address);
-    
     char* label;
     err = neoc_account_get_label(account, &label);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
@@ -279,9 +278,11 @@ void test_create_multisig_account_from_public_keys(void) {
     size_t expected_len;
     err = neoc_hex_decode(COMMITTEE_ACCOUNT_VERIFICATION_SCRIPT, expected_script, sizeof(expected_script), &expected_len);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
-    
+
     TEST_ASSERT_EQUAL_INT(expected_len, script_len);
     TEST_ASSERT_EQUAL_MEMORY(expected_script, verification_script, script_len);
+
+    TEST_ASSERT_EQUAL_STRING(COMMITTEE_ACCOUNT_ADDRESS, address);
     
     neoc_free(address);
     neoc_free(label);
@@ -647,6 +648,7 @@ void test_is_multisig(void) {
     
     err = neoc_account_is_multisig(multisig_account1, &is_multisig);
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
+    
     TEST_ASSERT_TRUE(is_multisig);
     
     // Multi-sig account from verification script

@@ -4,70 +4,10 @@
  */
 
 #include "neoc/script/interop_service.h"
+#include "neoc/crypto/neoc_hash.h"
 #include <string.h>
 
-// XXH32 hash function for interop service names
-static uint32_t xxh32(const uint8_t* data, size_t len, uint32_t seed) {
-    const uint32_t prime1 = 0x9E3779B1;
-    const uint32_t prime2 = 0x85EBCA77;
-    const uint32_t prime3 = 0xC2B2AE3D;
-    const uint32_t prime4 = 0x27D4EB2F;
-    const uint32_t prime5 = 0x165667B1;
-    
-    uint32_t hash;
-    size_t remaining = len;
-    const uint8_t* ptr = data;
-    
-    if (len >= 16) {
-        uint32_t v1 = seed + prime1 + prime2;
-        uint32_t v2 = seed + prime2;
-        uint32_t v3 = seed;
-        uint32_t v4 = seed - prime1;
-        
-        while (remaining >= 16) {
-            v1 = ((v1 + (*(uint32_t*)ptr) * prime2) << 13 | (v1 + (*(uint32_t*)ptr) * prime2) >> 19) * prime1;
-            ptr += 4;
-            v2 = ((v2 + (*(uint32_t*)ptr) * prime2) << 13 | (v2 + (*(uint32_t*)ptr) * prime2) >> 19) * prime1;
-            ptr += 4;
-            v3 = ((v3 + (*(uint32_t*)ptr) * prime2) << 13 | (v3 + (*(uint32_t*)ptr) * prime2) >> 19) * prime1;
-            ptr += 4;
-            v4 = ((v4 + (*(uint32_t*)ptr) * prime2) << 13 | (v4 + (*(uint32_t*)ptr) * prime2) >> 19) * prime1;
-            ptr += 4;
-            remaining -= 16;
-        }
-        
-        hash = ((v1 << 1) | (v1 >> 31)) + ((v2 << 7) | (v2 >> 25)) + 
-               ((v3 << 12) | (v3 >> 20)) + ((v4 << 18) | (v4 >> 14));
-    } else {
-        hash = seed + prime5;
-    }
-    
-    hash += (uint32_t)len;
-    
-    while (remaining >= 4) {
-        hash += *(uint32_t*)ptr * prime3;
-        hash = ((hash << 17) | (hash >> 15)) * prime4;
-        ptr += 4;
-        remaining -= 4;
-    }
-    
-    while (remaining > 0) {
-        hash += *ptr * prime5;
-        hash = ((hash << 11) | (hash >> 21)) * prime1;
-        ptr++;
-        remaining--;
-    }
-    
-    hash ^= hash >> 15;
-    hash *= prime2;
-    hash ^= hash >> 13;
-    hash *= prime3;
-    hash ^= hash >> 16;
-    
-    return hash;
-}
-
-static const neoc_interop_descriptor_t interop_table[] = {
+static neoc_interop_descriptor_t interop_table[] = {
     // System namespace
     {NEOC_INTEROP_SYSTEM_BINARY_SERIALIZE, "System.Binary.Serialize", 0},
     {NEOC_INTEROP_SYSTEM_BINARY_DESERIALIZE, "System.Binary.Deserialize", 0},
@@ -86,7 +26,7 @@ static const neoc_interop_descriptor_t interop_table[] = {
     {NEOC_INTEROP_SYSTEM_CONTRACT_GETHASH, "System.Contract.GetHash", 0},
     
     {NEOC_INTEROP_SYSTEM_CRYPTO_CHECKSIG, "System.Crypto.CheckSig", 0},
-    {NEOC_INTEROP_SYSTEM_CRYPTO_CHECKMULTISIG, "System.Crypto.CheckMultiSig", 0},
+    {NEOC_INTEROP_SYSTEM_CRYPTO_CHECKMULTISIG, "System.Crypto.CheckMultisig", 0},
     
     {NEOC_INTEROP_SYSTEM_ITERATOR_CREATE, "System.Iterator.Create", 0},
     {NEOC_INTEROP_SYSTEM_ITERATOR_NEXT, "System.Iterator.Next", 0},
@@ -144,7 +84,18 @@ static void initialize_interop_table(void) {
     // Calculate hashes for all interop services
     for (size_t i = 0; i < sizeof(interop_table) / sizeof(interop_table[0]); i++) {
         neoc_interop_descriptor_t* desc = (neoc_interop_descriptor_t*)&interop_table[i];
-        desc->hash = xxh32((const uint8_t*)desc->name, strlen(desc->name), 0);
+        uint8_t sha256[NEOC_SHA256_DIGEST_LENGTH];
+        neoc_error_t err = neoc_sha256((const uint8_t*)desc->name, strlen(desc->name), sha256);
+        if (err != NEOC_SUCCESS) {
+            desc->hash = 0;
+            continue;
+        }
+
+        desc->hash =
+            (uint32_t)sha256[0] |
+            ((uint32_t)sha256[1] << 8) |
+            ((uint32_t)sha256[2] << 16) |
+            ((uint32_t)sha256[3] << 24);
     }
     
     interop_table_initialized = 1;

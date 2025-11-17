@@ -54,6 +54,18 @@ neoc_error_t neoc_nns_name_is_expired(const neoc_nns_name_t *nns_name,
                                        bool *expired);
 
 /**
+ * Check if this name represents a root domain (no dots)
+ */
+neoc_error_t neoc_nns_name_is_root(const neoc_nns_name_t *nns_name,
+                                    bool *is_root);
+
+/**
+ * Get the parent domain for a subdomain (NULL for roots)
+ */
+neoc_error_t neoc_nns_name_get_parent(const neoc_nns_name_t *nns_name,
+                                       char **parent);
+
+/**
  * Free NNS name
  */
 void neoc_nns_name_free(neoc_nns_name_t *nns_name);

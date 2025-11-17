@@ -29,10 +29,10 @@ extern "C" {
  */
 typedef struct {
     char *token_id;                     /**< Unique NFT token identifier */
-    int timestamp;                      /**< Transfer timestamp */
+    int64_t timestamp;                  /**< Transfer timestamp */
     neoc_hash160_t asset_hash;          /**< NFT contract hash */
     char *transfer_address;             /**< Transfer counterpart address */
-    int amount;                         /**< Transfer amount as integer */
+    int64_t amount;                     /**< Transfer amount */
     int block_index;                    /**< Block index where transfer occurred */
     int transfer_notify_index;          /**< Transfer notification index */
     neoc_hash256_t tx_hash;             /**< Transaction hash */
@@ -81,10 +81,10 @@ typedef struct {
  */
 neoc_error_t neoc_nep11_transfer_create(
     const char *token_id,
-    int timestamp,
+    int64_t timestamp,
     const neoc_hash160_t *asset_hash,
     const char *transfer_address,
-    int amount,
+    int64_t amount,
     int block_index,
     int transfer_notify_index,
     const neoc_hash256_t *tx_hash,

@@ -79,19 +79,36 @@ neoc_error_t neoc_gas_token_create(neoc_gas_token_t **token) {
 }
 
 neoc_error_t neoc_gas_token_balance_of(neoc_gas_token_t *token,
+                                       neoc_rpc_client_t *rpc_client,
                                        const neoc_hash160_t *account,
                                        uint64_t *balance) {
-    if (!account || !balance) {
-        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Account and balance output are required");
+    if (!token || !rpc_client || !account || !balance) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Token, RPC client, account, and balance output are required");
     }
     neoc_error_t err = neoc_gas_token_validate(token);
     if (err != NEOC_SUCCESS) {
         return err;
     }
 
-    *balance = 0;
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED,
-                          "Balance queries require an RPC client integration");
+    neoc_nep17_balance_t *balances = NULL;
+    size_t balance_count = 0;
+    err = neoc_rpc_get_nep17_balances(rpc_client, account, &balances, &balance_count);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    uint64_t gas_balance = 0;
+    for (size_t i = 0; i < balance_count; ++i) {
+        if (memcmp(&balances[i].asset_hash, &NEOC_GAS_TOKEN_HASH, sizeof(neoc_hash160_t)) == 0) {
+            const char *amount_str = balances[i].amount ? balances[i].amount : "0";
+            gas_balance = (uint64_t)strtoull(amount_str, NULL, 10);
+            break;
+        }
+    }
+
+    neoc_rpc_nep17_balances_free(balances, balance_count);
+    *balance = gas_balance;
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_gas_token_transfer(neoc_gas_token_t *token,

@@ -95,6 +95,7 @@ neoc_error_t neoc_http_service_create_with_config(const char *url,
     http_service->base = base;
     http_service->headers = NULL;
     http_service->header_count = 0;
+    http_service->owns_base = true;
 
     *service = http_service;
     return NEOC_SUCCESS;
@@ -102,7 +103,7 @@ neoc_error_t neoc_http_service_create_with_config(const char *url,
 
 void neoc_http_service_free(neoc_http_service_t *service) {
     if (!service) return;
-    if (service->base) {
+    if (service->base && service->owns_base) {
         neoc_service_free(service->base);
     }
     free_headers(service->headers, service->header_count);
@@ -209,7 +210,18 @@ neoc_service_t* neoc_http_service_get_base(neoc_http_service_t *http_service) {
 }
 
 neoc_http_service_t* neoc_http_service_from_base(neoc_service_t *service) {
-    return NULL; // Not implemented yet
+    if (!service || service->type != NEOC_SERVICE_TYPE_HTTP) {
+        return NULL;
+    }
+    neoc_http_service_t *http_service = neoc_calloc(1, sizeof(neoc_http_service_t));
+    if (!http_service) {
+        return NULL;
+    }
+    http_service->base = service;
+    http_service->headers = NULL;
+    http_service->header_count = 0;
+    http_service->owns_base = false;
+    return http_service;
 }
 
 size_t neoc_http_service_get_header_count(const neoc_http_service_t *service) {

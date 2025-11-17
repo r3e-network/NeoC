@@ -51,7 +51,7 @@ char *neoc_stack_item_to_json(const neoc_stack_item_t *obj) {
         return NULL;
     }
     
-    snprintf(json, 512, "{\"type\":\"stack_item\"});
+    snprintf(json, 512, "{\"type\":\"stack_item\"}");
     return json;
 }
 

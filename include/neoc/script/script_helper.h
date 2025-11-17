@@ -98,6 +98,21 @@ neoc_error_t neoc_script_create_contract_invocation(const neoc_hash160_t *script
                                                      size_t *script_len);
 
 /**
+ * @brief Create an invocation script for an NEP-17 transfer.
+ *
+ * The resulting script invokes transfer(from, to, amount, data) and appends an ASSERT to
+ * ensure the invocation returned true.
+ */
+neoc_error_t neoc_script_create_nep17_transfer(const neoc_hash160_t *token_hash,
+                                               const neoc_hash160_t *from,
+                                               const neoc_hash160_t *to,
+                                               uint64_t amount,
+                                               const uint8_t *data,
+                                               size_t data_len,
+                                               uint8_t **script,
+                                               size_t *script_len);
+
+/**
  * @brief Create a witness script from verification and invocation scripts
  * 
  * @param invocation_script Invocation script

@@ -1,40 +1,87 @@
-/**
- * @file test_mock_u_r_l_session.c
- * @brief Unit tests converted from MockURLSession.swift
- */
-
-#include <stdio.h>
+#include "unity.h"
 #include <string.h>
-#include <assert.h>
 #include "neoc/neoc.h"
+#include "neoc/utils/url_session.h"
+#include "neoc/utils/array.h"
 
-// Test setup
-static void setUp(void) {
-    neoc_error_t err = neoc_init();
-    assert(err == NEOC_SUCCESS);
+static neoc_url_session_t *session = NULL;
+static neoc_http_request_t *request = NULL;
+
+void setUp(void) {
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, neoc_init());
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, neoc_url_session_create(&session));
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
+                          neoc_http_request_create("https://example.com",
+                                                   NEOC_HTTP_POST,
+                                                   &request));
 }
 
-// Test teardown
-static void tearDown(void) {
+void tearDown(void) {
+    neoc_http_request_free(request);
+    neoc_url_session_free(session);
+    request = NULL;
+    session = NULL;
     neoc_cleanup();
 }
 
-// Placeholder test
-static void test_placeholder(void) {
-    printf("Test placeholder for MockURLSession\n");
-    assert(1 == 1);
+void test_http_request_headers_and_body_string(void) {
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
+                          neoc_http_request_add_header(request,
+                                                       "Content-Type",
+                                                       "application/json"));
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
+                          neoc_http_request_add_header(request,
+                                                       "X-Request-ID",
+                                                       "abc123"));
+    const char *body = "{\"ping\":true}";
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
+                          neoc_http_request_set_body_string(request, body));
+
+    TEST_ASSERT_EQUAL_UINT(2, request->header_count);
+    TEST_ASSERT_EQUAL_STRING("Content-Type", request->headers[0].name);
+    TEST_ASSERT_EQUAL_STRING("application/json", request->headers[0].value);
+    TEST_ASSERT_EQUAL_STRING("X-Request-ID", request->headers[1].name);
+    TEST_ASSERT_EQUAL_STRING("abc123", request->headers[1].value);
+    TEST_ASSERT_NOT_NULL(request->body);
+    TEST_ASSERT_EQUAL_UINT(strlen(body), request->body->length);
+    TEST_ASSERT_EQUAL_MEMORY(body, request->body->data, request->body->length);
+}
+
+void test_http_request_body_from_byte_array(void) {
+    const uint8_t raw[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    neoc_byte_array_t *byte_array = NULL;
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
+                          neoc_byte_array_from_data(raw, sizeof(raw), &byte_array));
+    TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
+                          neoc_http_request_set_body(request, byte_array));
+
+    TEST_ASSERT_NOT_NULL(request->body);
+    TEST_ASSERT_EQUAL_UINT(sizeof(raw), request->body->length);
+    TEST_ASSERT_EQUAL_MEMORY(raw, request->body->data, sizeof(raw));
+
+    byte_array->data[0] = 0x00;
+    TEST_ASSERT_EQUAL_UINT8(0xDE, request->body->data[0]);
+
+    neoc_free(byte_array->data);
+    neoc_free(byte_array);
+}
+
+void test_http_request_invalid_arguments(void) {
+    neoc_byte_array_t array = {0};
+    TEST_ASSERT_EQUAL_INT(NEOC_ERROR_INVALID_ARGUMENT,
+                          neoc_http_request_add_header(NULL, "A", "B"));
+    TEST_ASSERT_EQUAL_INT(NEOC_ERROR_INVALID_ARGUMENT,
+                          neoc_http_request_set_body(NULL, &array));
+    TEST_ASSERT_EQUAL_INT(NEOC_ERROR_INVALID_ARGUMENT,
+                          neoc_http_request_set_body(request, NULL));
+    TEST_ASSERT_EQUAL_INT(NEOC_ERROR_INVALID_ARGUMENT,
+                          neoc_http_request_set_body_string(request, NULL));
 }
 
 int main(void) {
-    printf("\n=== MockURLSession Tests ===\n\n");
-    
-    setUp();
-    
-    // Run tests
-    test_placeholder();
-    
-    tearDown();
-    
-    printf("\n✅ All MockURLSession tests passed!\n\n");
-    return 0;
+    UNITY_BEGIN();
+    RUN_TEST(test_http_request_headers_and_body_string);
+    RUN_TEST(test_http_request_body_from_byte_array);
+    RUN_TEST(test_http_request_invalid_arguments);
+    return UNITY_END();
 }

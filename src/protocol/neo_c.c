@@ -131,44 +131,8 @@ neoc_error_t neoc_neo_c_get_network_magic_number(neoc_neo_c_t *neo_c, int *magic
         return NEOC_SUCCESS;
     }
     
-    // Fetch network magic from node via RPC
-    neoc_request_t request = {
-        .id = 1,
-        .jsonrpc = "2.0",
-        .method = "getversion",
-        .params = "[]"
-    };
-    
-    neoc_response_t response = {0};
-    neoc_error_t err = neoc_rpc_client_send_request(neo_c->http_service, &request, &response);
-    
-    if (err != NEOC_SUCCESS) {
-        return err;
-    }
-    
-    // Parse the network magic from response
-    if (response.result && response.result->type == NEOC_STACK_ITEM_MAP) {
-        // Extract network field from version response
-        neoc_stack_item_t *network = neoc_stack_map_get(response.result, "network");
-        if (network && network->type == NEOC_STACK_ITEM_INTEGER) {
-            int magic = (int)network->value.integer;
-            
-            // Cache the value
-            if (!neo_c->config->network_magic) {
-                neo_c->config->network_magic = neoc_malloc(sizeof(int));
-            }
-            if (neo_c->config->network_magic) {
-                *neo_c->config->network_magic = magic;
-            }
-            
-            *magic_out = magic;
-            neoc_response_free(&response);
-            return NEOC_SUCCESS;
-        }
-    }
-    
-    neoc_response_free(&response);
-    return NEOC_ERROR_INVALID_RESPONSE;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED,
+                          "Network magic retrieval not implemented");
 }
 
 /**
@@ -179,7 +143,7 @@ neoc_error_t neoc_neo_c_get_network_magic_number_bytes(neoc_neo_c_t *neo_c, uint
         return NEOC_ERROR_INVALID_ARGUMENT;
     }
     
-    int magic;
+    int magic = 0;
     neoc_error_t error = neoc_neo_c_get_network_magic_number(neo_c, &magic);
     if (error != NEOC_SUCCESS) {
         return error;
@@ -201,12 +165,12 @@ neoc_error_t neoc_neo_c_get_network_magic_number_bytes(neoc_neo_c_t *neo_c, uint
 neoc_error_t neoc_neo_c_send_request(neoc_neo_c_t *neo_c,
                                     const neoc_byte_array_t *request_data,
                                     neoc_response_t **response_out) {
-    if (!neo_c || !request_data || !response_out) {
-        return NEOC_ERROR_INVALID_ARGUMENT;
+    (void)neo_c;
+    (void)request_data;
+    if (response_out) {
+        *response_out = NULL;
     }
-    
-    // Use the underlying service to send the request
-    return neoc_service_send(neo_c->neo_c_service, request_data, response_out);
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Service send not implemented");
 }
 
 /**
@@ -216,13 +180,11 @@ neoc_error_t neoc_neo_c_send_request_async(neoc_neo_c_t *neo_c,
                                           const neoc_byte_array_t *request_data,
                                           neoc_neo_c_callback_t callback,
                                           void *user_data) {
-    if (!neo_c || !request_data || !callback) {
-        return NEOC_ERROR_INVALID_ARGUMENT;
-    }
-    
-    // Use the underlying service to send the request asynchronously
-    return neoc_service_send_async(neo_c->neo_c_service, request_data,
-                                  (neoc_service_callback_t)callback, user_data);
+    (void)neo_c;
+    (void)request_data;
+    (void)callback;
+    (void)user_data;
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Async service send not implemented");
 }
 
 /**
@@ -312,4 +274,3 @@ void neoc_neo_c_free(neoc_neo_c_t *neo_c) {
     
     neoc_free(neo_c);
 }
-

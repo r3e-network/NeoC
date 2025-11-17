@@ -6,18 +6,105 @@
  * Provides the base service functionality for all Neo blockchain services
  */
 
-#include "../../include/neoc/neoc_error.h"
-#include "../../include/neoc/neoc_memory.h"
-#include "../../include/neoc/protocol/service.h"
-#include "../../include/neoc/protocol/core/request.h"
-#include "../../include/neoc/protocol/core/response.h"
-#include "../../include/neoc/utils/array.h"
-#include "../../include/neoc/utils/url_session.h"
-#include "../../include/neoc/utils/decode.h"
+#include "neoc/neoc_error.h"
+#include "neoc/neoc_memory.h"
+#include "neoc/protocol/service.h"
+#include "neoc/protocol/core/request.h"
+#include "neoc/protocol/core/response.h"
+#include "neoc/utils/array.h"
+#include "neoc/utils/url_session.h"
+#include "neoc/utils/decode.h"
 #include <cjson/cJSON.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+static neoc_error_t neoc_service_config_copy(neoc_service_config_t *dest,
+                                             const neoc_service_config_t *src) {
+    if (!dest || !src) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+
+    memset(dest, 0, sizeof(*dest));
+
+    if (src->endpoint_url) {
+        size_t len = strlen(src->endpoint_url) + 1;
+        dest->endpoint_url = neoc_malloc(len);
+        if (!dest->endpoint_url) {
+            return NEOC_ERROR_OUT_OF_MEMORY;
+        }
+        memcpy(dest->endpoint_url, src->endpoint_url, len);
+    }
+
+    dest->include_raw_responses = src->include_raw_responses;
+    dest->timeout_seconds = src->timeout_seconds;
+    dest->auto_retry = src->auto_retry;
+    dest->max_retries = src->max_retries;
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_service_config_create_default(const char *url,
+                                                neoc_service_config_t **config) {
+    if (!config) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+    *config = NULL;
+
+    neoc_service_config_t *cfg = neoc_calloc(1, sizeof(neoc_service_config_t));
+    if (!cfg) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+
+    cfg->endpoint_url = NULL;
+    if (url) {
+        size_t len = strlen(url) + 1;
+        cfg->endpoint_url = neoc_malloc(len);
+        if (!cfg->endpoint_url) {
+            neoc_free(cfg);
+            return NEOC_ERROR_OUT_OF_MEMORY;
+        }
+        memcpy(cfg->endpoint_url, url, len);
+    }
+
+    cfg->include_raw_responses = false;
+    cfg->timeout_seconds = 30;
+    cfg->auto_retry = true;
+    cfg->max_retries = 3;
+
+    *config = cfg;
+    return NEOC_SUCCESS;
+}
+
+void neoc_service_config_free(neoc_service_config_t *config) {
+    if (!config) return;
+    if (config->endpoint_url) {
+        neoc_free(config->endpoint_url);
+        config->endpoint_url = NULL;
+    }
+    neoc_free(config);
+}
+
+neoc_error_t neoc_service_init(neoc_service_t *service,
+                               neoc_service_type_t type,
+                               const neoc_service_config_t *config,
+                               neoc_service_vtable_t *vtable,
+                               void *impl_data) {
+    if (!service || !config) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+
+    memset(service, 0, sizeof(*service));
+    service->type = type;
+    service->vtable = vtable;
+    service->impl_data = impl_data;
+
+    neoc_error_t err = neoc_service_config_copy(&service->config, config);
+    if (err != NEOC_SUCCESS) {
+        memset(&service->config, 0, sizeof(service->config));
+        return err;
+    }
+    return NEOC_SUCCESS;
+}
 
 /**
  * @brief Create a new service instance
@@ -40,36 +127,28 @@ neoc_error_t neoc_service_create(neoc_service_type_t type,
     new_service->type = type;
     new_service->vtable = NULL;
     new_service->impl_data = NULL;
-    
-    // Copy configuration
-    if (config->endpoint_url) {
-        size_t url_len = strlen(config->endpoint_url) + 1;
-        new_service->config.endpoint_url = neoc_malloc(url_len);
-        if (!new_service->config.endpoint_url) {
-            neoc_free(new_service);
-            return NEOC_ERROR_OUT_OF_MEMORY;
-        }
-        strcpy(new_service->config.endpoint_url, config->endpoint_url);
-    } else {
-        new_service->config.endpoint_url = NULL;
+
+    neoc_error_t err = neoc_service_config_copy(&new_service->config, config);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(new_service);
+        return err;
     }
     
-    new_service->config.include_raw_responses = config->include_raw_responses;
-    new_service->config.timeout_seconds = config->timeout_seconds > 0 ? config->timeout_seconds : 60;
-    new_service->config.auto_retry = config->auto_retry;
-    new_service->config.max_retries = config->max_retries;
+    if (new_service->config.timeout_seconds <= 0) {
+        new_service->config.timeout_seconds = 60;
+    }
 
     neoc_url_session_config_t session_config;
     neoc_url_session_get_default_config(&session_config);
     session_config.timeout_seconds = new_service->config.timeout_seconds;
     neoc_url_session_t *session = NULL;
-    neoc_error_t err = neoc_url_session_create_with_config(&session_config, &session);
-    if (err != NEOC_SUCCESS) {
+    neoc_error_t session_err = neoc_url_session_create_with_config(&session_config, &session);
+    if (session_err != NEOC_SUCCESS) {
         if (new_service->config.endpoint_url) {
             neoc_free(new_service->config.endpoint_url);
         }
         neoc_free(new_service);
-        return err;
+        return session_err;
     }
     new_service->impl_data = session;
     
@@ -149,7 +228,7 @@ neoc_error_t neoc_service_send_request(neoc_service_t *service,
 
     if (!result || !result->data) {
         neoc_byte_array_free(result);
-        return NEOC_ERROR_INVALID_RESPONSE;
+        return NEOC_ERROR_INVALID_FORMAT;
     }
 
     char *response_str = neoc_malloc(result->length + 1);
@@ -165,7 +244,7 @@ neoc_error_t neoc_service_send_request(neoc_service_t *service,
         neoc_byte_array_free(result);
         neoc_free(response_str);
         if (response_json) cJSON_Delete(response_json);
-        return NEOC_ERROR_INVALID_RESPONSE;
+        return NEOC_ERROR_INVALID_FORMAT;
     }
 
     neoc_response_t *resp = neoc_response_create(request->id);
@@ -443,24 +522,26 @@ neoc_error_t neoc_service_get_config(neoc_service_t *service,
     if (!service || !config) {
         return NEOC_ERROR_INVALID_PARAM;
     }
-    
+
     if (service->vtable && service->vtable->get_config) {
         return service->vtable->get_config(service, config);
     }
-    
-    // Default implementation - copy configuration
-    *config = service->config;
-    
-    // Duplicate URL string if present
+
+    config->endpoint_url = NULL;
+    config->include_raw_responses = service->config.include_raw_responses;
+    config->timeout_seconds = service->config.timeout_seconds;
+    config->auto_retry = service->config.auto_retry;
+    config->max_retries = service->config.max_retries;
+
     if (service->config.endpoint_url) {
         size_t url_len = strlen(service->config.endpoint_url) + 1;
         config->endpoint_url = neoc_malloc(url_len);
         if (!config->endpoint_url) {
             return NEOC_ERROR_OUT_OF_MEMORY;
         }
-        strcpy(config->endpoint_url, service->config.endpoint_url);
+        memcpy(config->endpoint_url, service->config.endpoint_url, url_len);
     }
-    
+
     return NEOC_SUCCESS;
 }
 

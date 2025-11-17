@@ -79,7 +79,6 @@ static void compress(uint32_t state[5], const uint8_t block[64]) {
     for (int i = 0; i < 80; ++i) {
         uint32_t t;
         uint32_t s;
-        uint32_t r;
         if (i < 16) { t = F(b1, c1, d1) + X[r1[i]] + K1[0]; s = s1[i]; }
         else if (i < 32) { t = G(b1, c1, d1) + X[r1[i]] + K1[1]; s = s1[i]; }
         else if (i < 48) { t = H(b1, c1, d1) + X[r1[i]] + K1[2]; s = s1[i]; }

@@ -61,7 +61,7 @@ neoc_error_t neoc_binary_reader_read_bool(neoc_binary_reader_t *reader,
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
     
-    uint8_t byte_val;
+    uint8_t byte_val = 0;
     neoc_error_t err = neoc_binary_reader_read_byte(reader, &byte_val);
     if (err != NEOC_SUCCESS) return err;
     
@@ -148,7 +148,7 @@ neoc_error_t neoc_binary_reader_read_var_int(neoc_binary_reader_t *reader,
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
     
-    uint8_t prefix;
+    uint8_t prefix = 0;
     neoc_error_t err = neoc_binary_reader_read_byte(reader, &prefix);
     if (err != NEOC_SUCCESS) return err;
     
@@ -156,13 +156,13 @@ neoc_error_t neoc_binary_reader_read_var_int(neoc_binary_reader_t *reader,
         *value = prefix;
         return NEOC_SUCCESS;
     } else if (prefix == 0xFD) {
-        uint16_t val;
+        uint16_t val = 0;
         err = neoc_binary_reader_read_uint16(reader, &val);
         if (err != NEOC_SUCCESS) return err;
         *value = val;
         return NEOC_SUCCESS;
     } else if (prefix == 0xFE) {
-        uint32_t val;
+        uint32_t val = 0;
         err = neoc_binary_reader_read_uint32(reader, &val);
         if (err != NEOC_SUCCESS) return err;
         *value = val;
@@ -179,7 +179,7 @@ neoc_error_t neoc_binary_reader_read_var_bytes(neoc_binary_reader_t *reader,
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
     
-    uint64_t length;
+    uint64_t length = 0;
     neoc_error_t err = neoc_binary_reader_read_var_int(reader, &length);
     if (err != NEOC_SUCCESS) return err;
     
@@ -317,7 +317,7 @@ neoc_error_t neoc_binary_reader_read_encoded_ec_point(neoc_binary_reader_t *read
     *data = NULL;
     *len = 0;
     
-    uint8_t byte;
+    uint8_t byte = 0;
     neoc_error_t err = neoc_binary_reader_read_byte(reader, &byte);
     if (err != NEOC_SUCCESS) return err;
     
@@ -352,15 +352,15 @@ neoc_error_t neoc_binary_reader_read_push_data(neoc_binary_reader_t *reader,
     *data = NULL;
     *len = 0;
     
-    uint8_t byte;
+    uint8_t byte = 0;
     neoc_error_t err = neoc_binary_reader_read_byte(reader, &byte);
     if (err != NEOC_SUCCESS) return err;
-    
-    size_t size;
+
+    size_t size = 0;
     switch (byte) {
         case 0x4C: // PUSHDATA1
             {
-                uint8_t size8;
+                uint8_t size8 = 0;
                 err = neoc_binary_reader_read_byte(reader, &size8);
                 if (err != NEOC_SUCCESS) return err;
                 size = size8;
@@ -368,7 +368,7 @@ neoc_error_t neoc_binary_reader_read_push_data(neoc_binary_reader_t *reader,
             break;
         case 0x4D: // PUSHDATA2
             {
-                uint16_t size16;
+                uint16_t size16 = 0;
                 err = neoc_binary_reader_read_uint16(reader, &size16);
                 if (err != NEOC_SUCCESS) return err;
                 size = size16;
@@ -376,7 +376,7 @@ neoc_error_t neoc_binary_reader_read_push_data(neoc_binary_reader_t *reader,
             break;
         case 0x4E: // PUSHDATA4
             {
-                uint32_t size32;
+                uint32_t size32 = 0;
                 err = neoc_binary_reader_read_uint32(reader, &size32);
                 if (err != NEOC_SUCCESS) return err;
                 size = size32;
@@ -419,7 +419,7 @@ neoc_error_t neoc_binary_reader_read_var_bytes_max(neoc_binary_reader_t *reader,
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
     
-    uint64_t length;
+    uint64_t length = 0;
     neoc_error_t err = neoc_binary_reader_read_var_int(reader, &length);
     if (err != NEOC_SUCCESS) return err;
     
@@ -534,7 +534,7 @@ neoc_error_t neoc_binary_reader_read_push_big_int(neoc_binary_reader_t *reader,
     *len = 0;
     *is_negative = false;
     
-    uint8_t byte;
+    uint8_t byte = 0;
     neoc_error_t err = neoc_binary_reader_read_byte(reader, &byte);
     if (err != NEOC_SUCCESS) return err;
     

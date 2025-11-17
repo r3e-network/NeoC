@@ -503,12 +503,14 @@ endif()
 #     LABELS "wallet;multisig;unit"
 # )
 
-# Integration tests
-add_test(NAME IntegrationTests COMMAND test_integration)
-set_tests_properties(IntegrationTests PROPERTIES 
-    TIMEOUT 120
-    LABELS "integration;e2e"
-)
+if(CJSON_LIBRARY)
+    # Integration tests
+    add_test(NAME IntegrationTests COMMAND test_integration)
+    set_tests_properties(IntegrationTests PROPERTIES 
+        TIMEOUT 120
+        LABELS "integration;e2e"
+    )
+endif()
 
 # ===== COMPREHENSIVE TEST CASES =====
 

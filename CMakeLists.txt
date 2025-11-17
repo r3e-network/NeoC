@@ -97,6 +97,13 @@ set(NEOC_RESPONSE_SOURCES
     src/protocol/core/response/neo_address.c
     src/protocol/core/response/neo_application_log.c
     src/protocol/core/response/neo_block.c
+    src/protocol/core/response/neo_get_mem_pool.c
+    src/protocol/core/response/neo_get_nep17_balances.c
+    src/protocol/core/response/neo_get_nep17_transfers.c
+    src/protocol/core/response/neo_get_nep11_balances.c
+    src/protocol/core/response/neo_get_nep11_transfers.c
+    src/protocol/core/response/neo_get_next_block_validators.c
+    src/protocol/core/response/neo_get_token_balances.c
     src/protocol/core/response/neo_get_claimable.c
     src/protocol/core/response/neo_find_states.c
 )

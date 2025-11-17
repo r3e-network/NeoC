@@ -193,30 +193,27 @@ neoc_error_t neoc_script_builder_push_data(neoc_script_builder_t *builder,
     
     if (data_len == 0) {
         return neoc_script_builder_emit(builder, NEOC_OP_PUSH0);
-    } else if (data_len < 0x4C) {
-        // Direct push
-        neoc_error_t err = neoc_binary_writer_write_byte(builder->writer, (uint8_t)data_len);
-        if (err != NEOC_SUCCESS) return err;
-        return neoc_binary_writer_write_bytes(builder->writer, data, data_len);
-    } else if (data_len <= 0xFF) {
-        neoc_error_t err = neoc_script_builder_emit(builder, NEOC_OP_PUSHDATA1);
+    }
+
+    neoc_error_t err;
+    if (data_len <= 0xFF) {
+        err = neoc_script_builder_emit(builder, NEOC_OP_PUSHDATA1);
         if (err != NEOC_SUCCESS) return err;
         err = neoc_binary_writer_write_byte(builder->writer, (uint8_t)data_len);
         if (err != NEOC_SUCCESS) return err;
-        return neoc_binary_writer_write_bytes(builder->writer, data, data_len);
     } else if (data_len <= 0xFFFF) {
-        neoc_error_t err = neoc_script_builder_emit(builder, NEOC_OP_PUSHDATA2);
+        err = neoc_script_builder_emit(builder, NEOC_OP_PUSHDATA2);
         if (err != NEOC_SUCCESS) return err;
         err = neoc_binary_writer_write_uint16(builder->writer, (uint16_t)data_len);
         if (err != NEOC_SUCCESS) return err;
-        return neoc_binary_writer_write_bytes(builder->writer, data, data_len);
     } else {
-        neoc_error_t err = neoc_script_builder_emit(builder, NEOC_OP_PUSHDATA4);
+        err = neoc_script_builder_emit(builder, NEOC_OP_PUSHDATA4);
         if (err != NEOC_SUCCESS) return err;
         err = neoc_binary_writer_write_uint32(builder->writer, (uint32_t)data_len);
         if (err != NEOC_SUCCESS) return err;
-        return neoc_binary_writer_write_bytes(builder->writer, data, data_len);
     }
+
+    return neoc_binary_writer_write_bytes(builder->writer, data, data_len);
 }
 
 neoc_error_t neoc_script_builder_push_string(neoc_script_builder_t *builder, const char *str) {

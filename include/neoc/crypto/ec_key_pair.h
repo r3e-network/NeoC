@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <openssl/ec.h>
 #include <openssl/evp.h>
+#include "neoc/crypto/ecdsa_signature.h"
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/types/neoc_types.h"
 #include "neoc/neoc_error.h"
@@ -12,9 +13,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// Forward declaration
-struct neoc_ecdsa_signature_t;
 
 /**
  * @brief EC Private Key structure
@@ -103,7 +101,7 @@ neoc_error_t neoc_ec_key_pair_get_script_hash(const neoc_ec_key_pair_t *key_pair
  */
 neoc_error_t neoc_ec_key_pair_sign(const neoc_ec_key_pair_t *key_pair,
                                     const uint8_t *message_hash,
-                                    struct neoc_ecdsa_signature_t **signature);
+                                    neoc_ecdsa_signature_t **signature);
 
 /**
  * @brief Export the private key as WIF (Wallet Import Format)
@@ -202,6 +200,22 @@ neoc_error_t neoc_ec_key_pair_get_private_key(const neoc_ec_key_pair_t *key_pair
 neoc_error_t neoc_ec_key_pair_get_public_key(const neoc_ec_key_pair_t *key_pair,
                                               uint8_t *public_key,
                                               size_t *key_len);
+
+/**
+ * @brief Get the public key from a key pair as an allocated object.
+ *
+ * @param key_pair The key pair
+ * @param public_key Output public key object (caller must free with neoc_ec_public_key_free)
+ * @return NEOC_SUCCESS on success, error code otherwise
+ */
+neoc_error_t neoc_ec_key_pair_get_public_key_object(const neoc_ec_key_pair_t *key_pair,
+                                                    neoc_ec_public_key_t **public_key);
+
+neoc_error_t neoc_ec_public_key_to_bytes(const neoc_ec_public_key_t *public_key,
+                                          uint8_t *bytes,
+                                          size_t *len);
+neoc_error_t neoc_ec_public_key_clone(const neoc_ec_public_key_t *public_key,
+                                      neoc_ec_public_key_t **clone);
 
 #ifdef __cplusplus
 }

@@ -6,6 +6,7 @@
 #include "neoc/transaction/account_signer.h"
 #include "neoc/transaction/signer.h"
 #include "neoc/wallet/account.h"
+#include "neoc/neoc_error.h"
 #include "neoc/neoc_memory.h"
 #include <string.h>
 
@@ -58,44 +59,46 @@ neoc_error_t neoc_account_signer_none_hash(neoc_hash160_t *account_hash,
     if (!account_hash || !signer) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid parameters");
     }
-    
-    // Create account from script hash
-    neoc_account_t *account = NULL;
-    neoc_error_t err = neoc_account_from_script_hash(account_hash, NULL, &account);
+
+    neoc_account_t *account = neoc_calloc(1, sizeof(neoc_account_t));
+    if (!account) {
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate account");
+    }
+
+    memcpy(&account->script_hash, account_hash, sizeof(neoc_hash160_t));
+
+    account->address = neoc_calloc(NEOC_ADDRESS_LENGTH, sizeof(char));
+    if (!account->address) {
+        neoc_free(account);
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate address buffer");
+    }
+
+    neoc_error_t err = neoc_hash160_to_address(account_hash,
+                                               account->address,
+                                               NEOC_ADDRESS_LENGTH);
     if (err != NEOC_SUCCESS) {
+        neoc_free(account->address);
+        neoc_free(account);
         return err;
     }
-    
-    if (!account) {
-        // Fallback: create minimal account structure
-        account = neoc_calloc(1, sizeof(neoc_account_t));
-        if (!account) {
-            return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate account");
-        }
-        memcpy(&account->script_hash, account_hash, sizeof(neoc_hash160_t));
-        
-        // Generate address from script hash
-        uint8_t address_bytes[25];
-        address_bytes[0] = 0x35; // NEO3 address version byte
-        memcpy(address_bytes + 1, account_hash->data, 20);
-        
-        // Calculate checksum (first 4 bytes of double SHA256)
-        neoc_hash256_t hash1, hash2;
-        neoc_hash_sha256(address_bytes, 21, hash1.data);
-        neoc_hash_sha256(hash1.data, 32, hash2.data);
-        memcpy(address_bytes + 21, hash2.data, 4);
-        
-        // Encode to base58
-        account->address = neoc_base58_encode(address_bytes, 25);
-        account->label = NULL;
-        account->key_pair = NULL;
-    }
-    
-    neoc_error_t err = create_account_signer(account, NEOC_WITNESS_SCOPE_NONE, signer);
+
+    account->label = NULL;
+    account->key_pair = NULL;
+    account->is_locked = false;
+    account->is_default = false;
+    account->encrypted_key = NULL;
+    account->encrypted_key_len = 0;
+    account->extra = NULL;
+
+    err = create_account_signer(account, NEOC_WITNESS_SCOPE_NONE, signer);
     if (err != NEOC_SUCCESS) {
+        neoc_free(account->address);
         neoc_free(account);
+        return err;
     }
-    return err;
+
+    (*signer)->owns_account = true;
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_account_signer_called_by_entry(neoc_account_t *account,
@@ -121,8 +124,10 @@ neoc_error_t neoc_account_signer_called_by_entry_hash(neoc_hash160_t *account_ha
     neoc_error_t err = create_account_signer(account, NEOC_WITNESS_SCOPE_CALLED_BY_ENTRY, signer);
     if (err != NEOC_SUCCESS) {
         neoc_free(account);
+        return err;
     }
-    return err;
+    (*signer)->owns_account = true;
+    return NEOC_SUCCESS;
 }
 
 neoc_error_t neoc_account_signer_global(neoc_account_t *account,
@@ -148,8 +153,10 @@ neoc_error_t neoc_account_signer_global_hash(neoc_hash160_t *account_hash,
     neoc_error_t err = create_account_signer(account, NEOC_WITNESS_SCOPE_GLOBAL, signer);
     if (err != NEOC_SUCCESS) {
         neoc_free(account);
+        return err;
     }
-    return err;
+    (*signer)->owns_account = true;
+    return NEOC_SUCCESS;
 }
 
 neoc_account_t* neoc_account_signer_get_account(neoc_account_signer_t *signer) {
