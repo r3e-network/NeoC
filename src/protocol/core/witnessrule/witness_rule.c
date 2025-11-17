@@ -332,9 +332,11 @@ neoc_error_t neoc_witness_rule_to_json(
 neoc_error_t neoc_witness_rule_from_json(
     const char *json_str,
     neoc_witness_rule_t **rule) {
+    if (rule) {
+        *rule = NULL;
+    }
     (void)json_str;
-    (void)rule;
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Witness rule JSON parsing not implemented");
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Witness rule JSON parsing not implemented (cJSON required)");
 }
 
 neoc_error_t neoc_witness_rule_to_json(
@@ -344,7 +346,7 @@ neoc_error_t neoc_witness_rule_to_json(
     if (json_str) {
         *json_str = NULL;
     }
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Witness rule JSON serialization not implemented");
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Witness rule JSON serialization not implemented (cJSON required)");
 }
 
 #endif /* HAVE_CJSON */

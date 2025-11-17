@@ -704,9 +704,11 @@ static neoc_error_t neoc_witness_condition_to_json_object(
 neoc_error_t neoc_witness_condition_from_json(
     const char *json_str,
     neoc_witness_condition_t **condition) {
+    if (condition) {
+        *condition = NULL;
+    }
     (void)json_str;
-    (void)condition;
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "JSON parsing not implemented");
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "JSON parsing not implemented (cJSON required)");
 }
 
 neoc_error_t neoc_witness_condition_to_json(
@@ -716,7 +718,7 @@ neoc_error_t neoc_witness_condition_to_json(
     if (json_str) {
         *json_str = NULL;
     }
-    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "JSON serialization not implemented");
+    return neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "JSON serialization not implemented (cJSON required)");
 }
 
 #endif /* HAVE_CJSON */
