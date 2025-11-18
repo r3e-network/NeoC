@@ -54,6 +54,15 @@ neoc_error_t neoc_contract_manifest_from_json(const char *json,
 neoc_contract_manifest_t* neoc_contract_manifest_clone(const neoc_contract_manifest_t *manifest);
 
 /**
+ * @brief Release allocated members of an embedded manifest without freeing the struct itself.
+ *
+ * Use this when the manifest is part of another object.
+ *
+ * @param manifest Manifest to dispose
+ */
+void neoc_contract_manifest_dispose(neoc_contract_manifest_t *manifest);
+
+/**
  * @brief Serialize manifest to JSON string
  * 
  * @param manifest Manifest handle

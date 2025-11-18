@@ -328,6 +328,58 @@ neoc_error_t stack_item_to_integer(const stack_item_t* item, int64_t* result) {
     return NEOC_SUCCESS;
 }
 
+neoc_error_t stack_item_to_big_integer(const stack_item_t* item,
+                                       uint8_t* bytes,
+                                       size_t* length,
+                                       bool* is_negative) {
+    if (!item || !bytes || !length) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+    if (item->type != STACK_ITEM_TYPE_INTEGER) {
+        return NEOC_ERROR_INVALID_TYPE;
+    }
+    if (*length < item->value.integer.length) {
+        *length = item->value.integer.length;
+        return NEOC_ERROR_BUFFER_TOO_SMALL;
+    }
+    if (item->value.integer.length > 0) {
+        memcpy(bytes, item->value.integer.bytes, item->value.integer.length);
+    }
+    *length = item->value.integer.length;
+    if (is_negative) {
+        *is_negative = item->value.integer.is_negative;
+    }
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t stack_item_to_byte_array(const stack_item_t* item,
+                                      uint8_t* data,
+                                      size_t* length) {
+    if (!item || !data || !length) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+    size_t required = 0;
+    const uint8_t *source = NULL;
+    switch (item->type) {
+        case STACK_ITEM_TYPE_BYTE_STRING:
+        case STACK_ITEM_TYPE_BUFFER:
+            required = item->value.byte_string.length;
+            source = item->value.byte_string.data;
+            break;
+        default:
+            return NEOC_ERROR_INVALID_TYPE;
+    }
+    if (*length < required) {
+        *length = required;
+        return NEOC_ERROR_BUFFER_TOO_SMALL;
+    }
+    if (required > 0 && source) {
+        memcpy(data, source, required);
+    }
+    *length = required;
+    return NEOC_SUCCESS;
+}
+
 // Get array item count
 size_t stack_item_array_count(const stack_item_t* item) {
     if (!item) return 0;

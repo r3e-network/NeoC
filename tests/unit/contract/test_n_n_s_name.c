@@ -119,5 +119,5 @@ int main(void) {
     RUN_TEST(test_nns_name_create_and_accessors);
     RUN_TEST(test_nns_name_root_and_parent_logic);
     RUN_TEST(test_nns_name_invalid_arguments);
-    return UNITY_END();
+    return UnityEnd();
 }

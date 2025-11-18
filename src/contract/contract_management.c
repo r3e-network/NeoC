@@ -5,6 +5,8 @@
 
 #include "neoc/contract/contract_management.h"
 #include "neoc/contract/nef_file.h"
+#include "neoc/contract/contract_manifest.h"
+#include "neoc/protocol/response/contract_nef.h"
 #include "neoc/script/script_builder_full.h"
 #include "neoc/neoc_memory.h"
 #include "neoc/protocol/contract_response_types.h"
@@ -224,7 +226,15 @@ neoc_error_t neoc_contract_management_deploy(neoc_contract_management_t *mgmt,
     
     // Initialize NEF structure with deployment script
     if (nef) {
-        (*contract)->nef = *nef;
+        neoc_contract_nef_t *nef_clone = neoc_contract_nef_clone(nef);
+        if (!nef_clone) {
+            neoc_free(script);
+            neoc_contract_state_free(*contract);
+            *contract = NULL;
+            return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to clone NEF");
+        }
+        (*contract)->nef = *nef_clone;
+        neoc_free(nef_clone);
     } else {
         // Create basic NEF structure
         (*contract)->nef.magic = 0x3346454E; // "NEF3"
@@ -242,7 +252,15 @@ neoc_error_t neoc_contract_management_deploy(neoc_contract_management_t *mgmt,
     
     // Initialize manifest
     if (manifest) {
-        (*contract)->manifest = *manifest;
+        neoc_contract_manifest_t *manifest_clone = neoc_contract_manifest_clone(manifest);
+        if (!manifest_clone) {
+            neoc_free(script);
+            neoc_contract_state_free(*contract);
+            *contract = NULL;
+            return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to clone manifest");
+        }
+        (*contract)->manifest = *manifest_clone;
+        neoc_free(manifest_clone);
     } else {
         // Create basic manifest
         neoc_contract_manifest_t *temp_manifest = NULL;

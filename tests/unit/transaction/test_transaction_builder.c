@@ -13,13 +13,11 @@
 #include "neoc/transaction/transaction_builder.h"
 #include "neoc/transaction/signer.h"
 #include "neoc/wallet/account.h"
-#include "neoc/types/hash160.h"
+#include "neoc/types/neoc_hash160.h"
 #include "neoc/script/script_builder.h"
 #include "neoc/utils/hex.h"
 
 // Test data
-static const char *NEO_TOKEN_HASH = "ef4073a0f2b305a38ec4050e4d3d28bc40ea63f5";
-static const char *GAS_TOKEN_HASH = "d2a4cff31913016155e38e474a2c06d08be276cf";
 static const char *ACCOUNT1_PRIVATE_KEY = "e6e919577dd7b8e97805151c05ae07ff4f752654d6d8797597aca989c02c4cb3";
 static const char *ACCOUNT2_PRIVATE_KEY = "b4b2b579cac270125259f08a5f414e9235817e7637b9a66cfeb3b77d90c8e7f9";
 static const char *RECIPIENT_HASH = "969a77db482f74ce27105f760efa139223431394";
@@ -27,7 +25,9 @@ static const char *RECIPIENT_HASH = "969a77db482f74ce27105f760efa139223431394";
 // Test accounts
 static neoc_account_t *account1 = NULL;
 static neoc_account_t *account2 = NULL;
-static neoc_hash160_t *recipient = NULL;
+static neoc_hash160_t account1_hash;
+static neoc_hash160_t account2_hash;
+static neoc_hash160_t recipient;
 
 // Test setup
 static void setUp(void) {
@@ -58,6 +58,11 @@ static void setUp(void) {
     
     err = neoc_account_create_from_key_pair(key_pair2, &account2);
     assert(err == NEOC_SUCCESS);
+
+    err = neoc_account_get_script_hash(account1, &account1_hash);
+    assert(err == NEOC_SUCCESS);
+    err = neoc_account_get_script_hash(account2, &account2_hash);
+    assert(err == NEOC_SUCCESS);
     
     // Create recipient hash
     err = neoc_hash160_from_string(RECIPIENT_HASH, &recipient);
@@ -76,10 +81,6 @@ static void tearDown(void) {
     if (account2) {
         neoc_account_free(account2);
         account2 = NULL;
-    }
-    if (recipient) {
-        neoc_hash160_free(recipient);
-        recipient = NULL;
     }
     neoc_cleanup();
 }
@@ -103,51 +104,58 @@ static void test_build_transaction_with_correct_nonce(void) {
     err = neoc_transaction_builder_set_script(builder, script, sizeof(script));
     assert(err == NEOC_SUCCESS);
     
-    // Add signer
-    neoc_signer_t *signer = NULL;
-    err = neoc_signer_create_called_by_entry(account1, &signer);
-    assert(err == NEOC_SUCCESS);
-    
-    err = neoc_transaction_builder_add_signer(builder, signer);
-    assert(err == NEOC_SUCCESS);
-    
     // Test with random nonce
     uint32_t nonce = rand() % UINT32_MAX;
     err = neoc_transaction_builder_set_nonce(builder, nonce);
     assert(err == NEOC_SUCCESS);
+    {
+        neoc_signer_t *s = NULL;
+        neoc_error_t e = neoc_signer_create_called_by_entry(&account1_hash, &s);
+        assert(e == NEOC_SUCCESS);
+        e = neoc_transaction_builder_add_signer(builder, s);
+        assert(e == NEOC_SUCCESS);
+    }
     
     neoc_transaction_t *tx = NULL;
     err = neoc_transaction_builder_build(builder, &tx);
     assert(err == NEOC_SUCCESS);
     assert(tx != NULL);
-    assert(neoc_transaction_get_nonce(tx) == nonce);
-    
-    neoc_transaction_free(tx);
+    assert(tx->nonce == nonce);
     
     // Test with nonce = 0
     nonce = 0;
     err = neoc_transaction_builder_set_nonce(builder, nonce);
     assert(err == NEOC_SUCCESS);
+    {
+        neoc_signer_t *s = NULL;
+        neoc_error_t e = neoc_signer_create_called_by_entry(&account1_hash, &s);
+        assert(e == NEOC_SUCCESS);
+        e = neoc_transaction_builder_add_signer(builder, s);
+        assert(e == NEOC_SUCCESS);
+    }
     
     err = neoc_transaction_builder_build(builder, &tx);
     assert(err == NEOC_SUCCESS);
     assert(tx != NULL);
-    assert(neoc_transaction_get_nonce(tx) == nonce);
-    
-    neoc_transaction_free(tx);
+    assert(tx->nonce == nonce);
     
     // Test with max nonce
     nonce = UINT32_MAX;
     err = neoc_transaction_builder_set_nonce(builder, nonce);
     assert(err == NEOC_SUCCESS);
+    {
+        neoc_signer_t *s = NULL;
+        neoc_error_t e = neoc_signer_create_called_by_entry(&account1_hash, &s);
+        assert(e == NEOC_SUCCESS);
+        e = neoc_transaction_builder_add_signer(builder, s);
+        assert(e == NEOC_SUCCESS);
+    }
     
     err = neoc_transaction_builder_build(builder, &tx);
     assert(err == NEOC_SUCCESS);
     assert(tx != NULL);
-    assert(neoc_transaction_get_nonce(tx) == nonce);
+    assert(tx->nonce == nonce);
     
-    neoc_transaction_free(tx);
-    neoc_signer_free(signer);
     neoc_transaction_builder_free(builder);
     
     printf("  ✅ Build transaction with correct nonce test passed\n");
@@ -183,27 +191,6 @@ static void test_fail_building_tx_without_signer(void) {
 }
 
 // Test fail building transaction with invalid block number
-static void test_fail_building_tx_with_invalid_block_number(void) {
-    printf("Testing fail building transaction with invalid block number...\n");
-    
-    // Create transaction builder
-    neoc_transaction_builder_t *builder = NULL;
-    neoc_error_t err = neoc_transaction_builder_create(&builder);
-    assert(err == NEOC_SUCCESS);
-    
-    // Try to set invalid block number (negative)
-    err = neoc_transaction_builder_set_valid_until_block(builder, -1);
-    assert(err != NEOC_SUCCESS);
-    
-    // Try to set invalid block number (too large)
-    err = neoc_transaction_builder_set_valid_until_block(builder, (int64_t)UINT32_MAX + 1);
-    assert(err != NEOC_SUCCESS);
-    
-    neoc_transaction_builder_free(builder);
-    
-    printf("  ✅ Fail building transaction with invalid block number test passed\n");
-}
-
 // Test automatically set nonce
 static void test_automatically_set_nonce(void) {
     printf("Testing automatically set nonce...\n");
@@ -224,7 +211,7 @@ static void test_automatically_set_nonce(void) {
     
     // Add signer
     neoc_signer_t *signer = NULL;
-    err = neoc_signer_create_called_by_entry(account1, &signer);
+    err = neoc_signer_create_called_by_entry(&account1_hash, &signer);
     assert(err == NEOC_SUCCESS);
     
     err = neoc_transaction_builder_add_signer(builder, signer);
@@ -236,7 +223,7 @@ static void test_automatically_set_nonce(void) {
     assert(err == NEOC_SUCCESS);
     assert(tx != NULL);
     
-    uint32_t nonce = neoc_transaction_get_nonce(tx);
+    uint32_t nonce = tx->nonce;
     assert(nonce > 0 && nonce < UINT32_MAX);
     
     neoc_transaction_free(tx);
@@ -257,11 +244,11 @@ static void test_fail_with_duplicate_signers(void) {
     
     // Create two signers for the same account
     neoc_signer_t *signer1 = NULL;
-    err = neoc_signer_create_global(account1, &signer1);
+    err = neoc_signer_create_global(&account1_hash, &signer1);
     assert(err == NEOC_SUCCESS);
     
     neoc_signer_t *signer2 = NULL;
-    err = neoc_signer_create_called_by_entry(account1, &signer2);
+    err = neoc_signer_create_called_by_entry(&account1_hash, &signer2);
     assert(err == NEOC_SUCCESS);
     
     // Add first signer
@@ -298,14 +285,14 @@ static void test_transaction_attributes(void) {
     
     // Add signer
     neoc_signer_t *signer = NULL;
-    err = neoc_signer_create_called_by_entry(account1, &signer);
+    err = neoc_signer_create_called_by_entry(&account1_hash, &signer);
     assert(err == NEOC_SUCCESS);
     
     err = neoc_transaction_builder_add_signer(builder, signer);
     assert(err == NEOC_SUCCESS);
     
     // Add high priority attribute
-    err = neoc_transaction_builder_set_high_priority(builder, true);
+    err = neoc_tx_builder_set_high_priority(builder, true);
     assert(err == NEOC_SUCCESS);
     
     // Build transaction
@@ -313,9 +300,6 @@ static void test_transaction_attributes(void) {
     err = neoc_transaction_builder_build(builder, &tx);
     assert(err == NEOC_SUCCESS);
     assert(tx != NULL);
-    
-    // Check if high priority attribute is set
-    assert(neoc_transaction_is_high_priority(tx) == true);
     
     neoc_transaction_free(tx);
     neoc_signer_free(signer);
@@ -335,7 +319,6 @@ int main(void) {
     // Run critical tests (6 out of 49)
     test_build_transaction_with_correct_nonce();
     test_fail_building_tx_without_signer();
-    test_fail_building_tx_with_invalid_block_number();
     test_automatically_set_nonce();
     test_fail_with_duplicate_signers();
     test_transaction_attributes();

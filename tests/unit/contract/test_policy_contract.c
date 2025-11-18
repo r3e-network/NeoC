@@ -99,5 +99,5 @@ int main(void) {
     RUN_TEST(test_policy_contract_set_fee_per_byte);
     RUN_TEST(test_policy_contract_is_blocked_defaults_to_false);
     RUN_TEST(test_policy_contract_invalid_arguments);
-    return UNITY_END();
+    return UnityEnd();
 }

@@ -159,5 +159,5 @@ int main(void) {
     RUN_TEST(test_contract_management_update_and_destroy);
     RUN_TEST(test_contract_management_get_contract_and_exists);
     RUN_TEST(test_contract_management_invalid_arguments);
-    return UNITY_END();
+    return UnityEnd();
 }

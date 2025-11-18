@@ -671,16 +671,28 @@ neoc_error_t neoc_contract_manifest_from_json(const char *json,
 #endif
 }
 
-void neoc_contract_manifest_free(neoc_contract_manifest_t *manifest) {
+void neoc_contract_manifest_dispose(neoc_contract_manifest_t *manifest) {
     if (!manifest) return;
     
     neoc_free(manifest->name);
+    manifest->name = NULL;
+    
+    // Free groups
+    for (size_t i = 0; i < manifest->group_count; i++) {
+        neoc_free(manifest->groups[i].pub_key);
+        neoc_free(manifest->groups[i].signature);
+    }
+    neoc_free(manifest->groups);
+    manifest->groups = NULL;
+    manifest->group_count = 0;
     
     // Free standards
     for (size_t i = 0; i < manifest->supported_standards_count; i++) {
         neoc_free(manifest->supported_standards[i]);
     }
     neoc_free(manifest->supported_standards);
+    manifest->supported_standards = NULL;
+    manifest->supported_standards_count = 0;
     
     // Free ABI
     // Free methods
@@ -689,6 +701,8 @@ void neoc_contract_manifest_free(neoc_contract_manifest_t *manifest) {
         neoc_free(manifest->abi.methods[i].parameters);
     }
     neoc_free(manifest->abi.methods);
+    manifest->abi.methods = NULL;
+    manifest->abi.method_count = 0;
     
     // Free events
     for (size_t i = 0; i < manifest->abi.event_count; i++) {
@@ -696,6 +710,8 @@ void neoc_contract_manifest_free(neoc_contract_manifest_t *manifest) {
         neoc_free(manifest->abi.events[i].parameters);
     }
     neoc_free(manifest->abi.events);
+    manifest->abi.events = NULL;
+    manifest->abi.event_count = 0;
     
     // Free permissions
     for (size_t i = 0; i < manifest->permission_count; i++) {
@@ -708,8 +724,27 @@ void neoc_contract_manifest_free(neoc_contract_manifest_t *manifest) {
         }
     }
     neoc_free(manifest->permissions);
+    manifest->permissions = NULL;
+    manifest->permission_count = 0;
+    
+    // Free trusts
+    for (size_t i = 0; i < manifest->trust_count; i++) {
+        neoc_free(manifest->trusts[i]);
+    }
+    neoc_free(manifest->trusts);
+    manifest->trusts = NULL;
+    manifest->trust_count = 0;
     
     neoc_free(manifest->extra);
+    manifest->extra = NULL;
+    manifest->trust_count = 0;
+    manifest->trust_wildcard = false;
+}
+
+void neoc_contract_manifest_free(neoc_contract_manifest_t *manifest) {
+    if (!manifest) return;
+    
+    neoc_contract_manifest_dispose(manifest);
     neoc_free(manifest);
 }
 

@@ -12,7 +12,7 @@ void tearDown(void) {
 
 static void assert_non_empty_string(const char *value) {
     TEST_ASSERT_NOT_NULL(value);
-    TEST_ASSERT_GREATER_THAN_INT(0, (int)strlen(value));
+    TEST_ASSERT_TRUE(strlen(value) > 0);
 }
 
 void test_mock_neoswift_environment_ready(void) {
@@ -30,5 +30,5 @@ int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_mock_neoswift_environment_ready);
     RUN_TEST(test_mock_neoswift_multiple_init_cleanup);
-    return UNITY_END();
+    return UnityEnd();
 }

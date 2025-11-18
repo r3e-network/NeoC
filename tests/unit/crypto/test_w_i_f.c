@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <strings.h>
 #include "neoc/neoc.h"
 #include "neoc/crypto/wif.h"
 #include "neoc/utils/neoc_base58.h"
@@ -39,7 +40,7 @@ static void test_valid_wif_to_private_key(void) {
     
     // Convert result to hex for comparison
     char hex_output[65];
-    err = neoc_hex_encode(private_key, 32, hex_output, sizeof(hex_output));
+    err = neoc_hex_encode(private_key, 32, hex_output, sizeof(hex_output), false, false);
     assert(err == NEOC_SUCCESS);
     
     // Compare with expected private key
@@ -161,12 +162,9 @@ static void test_wrongly_sized_private_key(void) {
     assert(err == NEOC_SUCCESS);
     assert(wrong_sized_len == 31);
     
-    uint8_t wrong_sized_key[32] = {0};
-    memcpy(wrong_sized_key, decoded_key, wrong_sized_len);
-    
-    // Attempt conversion (expected to fail because the input was derived from a 31 byte key)
+    // Attempt conversion using the actual byte length (should fail)
     char *wif = NULL;
-    err = neoc_private_key_to_wif(wrong_sized_key, &wif);
+    err = neoc_private_key_to_wif_len(decoded_key, wrong_sized_len, &wif);
     assert(err != NEOC_SUCCESS);
     assert(wif == NULL);
     

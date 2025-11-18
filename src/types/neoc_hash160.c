@@ -5,6 +5,7 @@
 
 #include "neoc/types/neoc_hash160.h"
 #include "neoc/crypto/neoc_hash.h"
+#include "neoc/script/script_helper.h"
 #include "neoc/utils/neoc_hex.h"
 #include "neoc/utils/neoc_base58.h"
 #include "neoc/serialization/binary_writer.h"
@@ -197,26 +198,20 @@ neoc_error_t neoc_hash160_from_public_key(neoc_hash160_t* hash, const uint8_t pu
     if (!hash || !public_key_data) {
         return NEOC_ERROR_NULL_POINTER;
     }
-    
-    /* Build verification script: PUSH<pubkey> SYSCALL System.Crypto.CheckSig */
-    uint8_t script[67];
-    size_t offset = 0;
-    
-    /* OpCode.PUSH1 + 33 bytes of public key */
-    script[offset++] = 0x21; /* PUSHDATA1 with 33 bytes */
-    memcpy(script + offset, public_key_data, NEOC_PUBLIC_KEY_SIZE_COMPRESSED);
-    offset += NEOC_PUBLIC_KEY_SIZE_COMPRESSED;
-    
-    /* OpCode.SYSCALL + interop service hash (System.Crypto.CheckSig) */
-    script[offset++] = 0x41; /* SYSCALL */
-    /* System.Crypto.CheckSig hash: 0x41c40f64 */
-    script[offset++] = 0x41;
-    script[offset++] = 0xc4;
-    script[offset++] = 0x0f;
-    script[offset++] = 0x64;
-    
-    /* Calculate hash160 of the script */
-    return neoc_hash160_from_script(hash, script, offset);
+
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    neoc_error_t err = neoc_script_create_single_sig_verification(public_key_data,
+                                                                  NEOC_PUBLIC_KEY_SIZE_COMPRESSED,
+                                                                  &script,
+                                                                  &script_len);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    err = neoc_hash160_from_script(hash, script, script_len);
+    neoc_free(script);
+    return err;
 }
 
 neoc_error_t neoc_hash160_from_public_keys(neoc_hash160_t* hash, 
@@ -234,45 +229,30 @@ neoc_error_t neoc_hash160_from_public_keys(neoc_hash160_t* hash,
     if (num_keys > NEOC_MAX_PUBLIC_KEYS_PER_MULTISIG_ACCOUNT) {
         return NEOC_ERROR_INVALID_ARGUMENT;
     }
-    
-    /* Build multi-sig verification script */
-    /* Script format: PUSH<m> <pubkey1> <pubkey2> ... <pubkeyn> PUSH<n> SYSCALL System.Crypto.CheckMultiSig */
-    uint8_t script[1024]; /* Max size for multi-sig script */
-    size_t offset = 0;
-    
-    /* Push signing threshold (m) */
-    if (signing_threshold <= 16) {
-        script[offset++] = 0x51 + (uint8_t)(signing_threshold - 1); /* PUSH1-PUSH16 */
-    } else {
-        script[offset++] = 0x00; /* PUSHINT8 */
-        script[offset++] = (uint8_t)signing_threshold;
+
+    // Reuse script helper to ensure identical script layout to multisig accounts
+    const uint8_t *key_ptrs[NEOC_MAX_PUBLIC_KEYS_PER_MULTISIG_ACCOUNT] = {0};
+    size_t key_lens[NEOC_MAX_PUBLIC_KEYS_PER_MULTISIG_ACCOUNT] = {0};
+    for (size_t i = 0; i < num_keys; ++i) {
+        key_ptrs[i] = public_keys[i];
+        key_lens[i] = NEOC_PUBLIC_KEY_SIZE_COMPRESSED;
     }
-    
-    /* Push all public keys */
-    for (size_t i = 0; i < num_keys; i++) {
-        script[offset++] = 0x21; /* PUSHDATA1 with 33 bytes */
-        memcpy(script + offset, public_keys[i], NEOC_PUBLIC_KEY_SIZE_COMPRESSED);
-        offset += NEOC_PUBLIC_KEY_SIZE_COMPRESSED;
+
+    uint8_t *script = NULL;
+    size_t script_len = 0;
+    neoc_error_t err = neoc_script_create_multisig_verification((uint8_t)signing_threshold,
+                                                                key_ptrs,
+                                                                key_lens,
+                                                                num_keys,
+                                                                &script,
+                                                                &script_len);
+    if (err != NEOC_SUCCESS) {
+        return err;
     }
-    
-    /* Push number of keys (n) */
-    if (num_keys <= 16) {
-        script[offset++] = 0x51 + (uint8_t)(num_keys - 1); /* PUSH1-PUSH16 */
-    } else {
-        script[offset++] = 0x00; /* PUSHINT8 */
-        script[offset++] = (uint8_t)num_keys;
-    }
-    
-    /* OpCode.SYSCALL + interop service hash (System.Crypto.CheckMultiSig) */
-    script[offset++] = 0x41; /* SYSCALL */
-    /* System.Crypto.CheckMultiSig hash: 0xbb3b1f6f */
-    script[offset++] = 0xbb;
-    script[offset++] = 0x3b;
-    script[offset++] = 0x1f;
-    script[offset++] = 0x6f;
-    
-    /* Calculate hash160 of the script */
-    return neoc_hash160_from_script(hash, script, offset);
+
+    err = neoc_hash160_from_script(hash, script, script_len);
+    neoc_free(script);
+    return err;
 }
 
 neoc_error_t neoc_hash160_copy(neoc_hash160_t* dest, const neoc_hash160_t* src) {

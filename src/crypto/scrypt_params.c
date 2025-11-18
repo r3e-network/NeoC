@@ -46,8 +46,8 @@ neoc_error_t neoc_scrypt_params_create(uint32_t n,
     }
     
     // Validate parameters
-    if (n == 0 || (n & (n - 1)) != 0) {  // n must be power of 2
-        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "N must be power of 2");
+    if (n < 1024 || (n & (n - 1)) != 0) {  // n must be power of 2 and reasonable
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "N must be power of 2 and >= 1024");
     }
     
     if (r == 0 || p == 0) {

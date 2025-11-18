@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <strings.h>
 #include "neoc/neoc.h"
 #include "neoc/crypto/base64.h"
 #include "neoc/utils/hex.h"
@@ -105,7 +106,7 @@ static void test_base64_decode(void) {
     char *hex_output = malloc(decoded_len * 2 + 1);
     assert(hex_output != NULL);
     
-    err = neoc_hex_encode(decoded, decoded_len, hex_output, decoded_len * 2 + 1);
+    err = neoc_hex_encode(decoded, decoded_len, hex_output, decoded_len * 2 + 1, false, false);
     assert(err == NEOC_SUCCESS);
     
     // Compare with expected (case-insensitive)

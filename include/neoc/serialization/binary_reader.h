@@ -24,6 +24,7 @@ struct neoc_binary_reader {
     size_t size;          // Total size of data
     size_t position;      // Current read position
     size_t marker;        // Marked position for reset (-1 if not set)
+    uint8_t *owned_data;  // Optional owned copy of data
 };
 
 /**

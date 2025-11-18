@@ -5,6 +5,7 @@
 
 #include "unity.h"
 #include <string.h>
+#include <math.h>
 #include "neoc/neoc.h"
 #include "neoc/utils/json.h"
 
@@ -34,7 +35,7 @@ void test_parse_basic_object(void) {
     double height = 0;
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
                           neoc_json_get_number(root, "height", &height));
-    TEST_ASSERT_EQUAL_DOUBLE(1234.0, height);
+    TEST_ASSERT_TRUE(fabs(height - 1234.0) < 1e-6);
 
     bool active = false;
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
@@ -73,7 +74,7 @@ void test_create_object_and_stringify(void) {
     double height = 0;
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
                           neoc_json_get_number(status, "height", &height));
-    TEST_ASSERT_EQUAL_DOUBLE(123456.0, height);
+    TEST_ASSERT_TRUE(fabs(height - 123456.0) < 1e-6);
 
     neoc_free(serialized);
     neoc_json_free(parsed);
@@ -113,5 +114,5 @@ int main(void) {
     RUN_TEST(test_parse_basic_object);
     RUN_TEST(test_create_object_and_stringify);
     RUN_TEST(test_array_operations);
-    return UNITY_END();
+    return UnityEnd();
 }

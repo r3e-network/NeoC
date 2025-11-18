@@ -81,12 +81,12 @@ neoc_error_t neoc_script_create_single_sig_invocation(const uint8_t *signature,
     return err;
 }
 
-neoc_error_t neoc_script_create_multi_sig_verification(const uint8_t **public_keys,
-                                                        size_t *key_lengths,
-                                                        size_t key_count,
-                                                        size_t min_signatures,
-                                                        uint8_t **script,
-                                                        size_t *script_len) {
+static neoc_error_t neoc_script_create_multi_sig_verification_internal(const uint8_t **public_keys,
+                                                                       size_t *key_lengths,
+                                                                       size_t key_count,
+                                                                       size_t min_signatures,
+                                                                       uint8_t **script,
+                                                                       size_t *script_len) {
     if (!public_keys || !key_lengths || !script || !script_len) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid arguments");
     }
@@ -145,6 +145,34 @@ neoc_error_t neoc_script_create_multi_sig_verification(const uint8_t **public_ke
     neoc_script_builder_free(builder);
     
     return err;
+}
+
+neoc_error_t neoc_script_create_multisig_verification(uint8_t minimum_signatures,
+                                                      const uint8_t **public_keys,
+                                                      const size_t *public_key_lens,
+                                                      size_t public_key_count,
+                                                      uint8_t **script,
+                                                      size_t *script_len) {
+    return neoc_script_create_multi_sig_verification_internal(public_keys,
+                                                              (size_t *)public_key_lens,
+                                                              public_key_count,
+                                                              minimum_signatures,
+                                                              script,
+                                                              script_len);
+}
+
+neoc_error_t neoc_script_create_multi_sig_verification(const uint8_t **public_keys,
+                                                        size_t *key_lengths,
+                                                        size_t key_count,
+                                                        size_t min_signatures,
+                                                        uint8_t **script,
+                                                        size_t *script_len) {
+    return neoc_script_create_multi_sig_verification_internal(public_keys,
+                                                              key_lengths,
+                                                              key_count,
+                                                              min_signatures,
+                                                              script,
+                                                              script_len);
 }
 
 neoc_error_t neoc_script_create_contract_call(const neoc_hash160_t *contract_hash,

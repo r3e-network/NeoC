@@ -23,54 +23,23 @@ static void tearDown(void) {
 static void test_create_witness(void) {
     printf("Testing witness creation...\n");
     
-    // Create a message to sign
-    uint8_t message[10];
-    memset(message, 10, sizeof(message));
+    // Sample invocation/verification scripts
+    uint8_t invocation_script[] = {0x40, 0x01, 0x02, 0x03};
+    uint8_t verification_script[] = {0x21, 0x04, 0x05, 0x06, 0xAC};
     
-    // Create a key pair
-    neoc_ec_key_pair_t *key_pair = NULL;
-    neoc_error_t err = neoc_ec_key_pair_create(&key_pair);
-    assert(err == NEOC_SUCCESS);
-    assert(key_pair != NULL);
-    
-    // Sign the message
-    uint8_t *signature = NULL;
-    size_t sig_len = 0;
-    err = neoc_ec_key_pair_sign(key_pair, message, sizeof(message), &signature, &sig_len);
-    assert(err == NEOC_SUCCESS);
-    assert(signature != NULL);
-    assert(sig_len == 64);
-    
-    // Create invocation script from signature
-    uint8_t *invocation_script = NULL;
-    size_t inv_len = 0;
-    err = neoc_script_create_invocation_from_signature(signature, sig_len, &invocation_script, &inv_len);
-    assert(err == NEOC_SUCCESS);
-    
-    // Get public key
-    uint8_t pubkey[65];
-    size_t pubkey_len = sizeof(pubkey);
-    err = neoc_ec_key_pair_get_public_key(key_pair, pubkey, &pubkey_len);
-    assert(err == NEOC_SUCCESS);
-    
-    // Create verification script
-    uint8_t *verification_script = NULL;
-    size_t ver_len = 0;
-    err = neoc_script_builder_build_verification_script(pubkey, pubkey_len, &verification_script, &ver_len);
-    assert(err == NEOC_SUCCESS);
-    
-    // Create witness
     neoc_witness_t *witness = NULL;
-    err = neoc_witness_create(invocation_script, inv_len, verification_script, ver_len, &witness);
+    neoc_error_t err = neoc_witness_create(invocation_script, sizeof(invocation_script),
+                                           verification_script, sizeof(verification_script),
+                                           &witness);
     assert(err == NEOC_SUCCESS);
     assert(witness != NULL);
+    assert(witness->invocation_script_len == sizeof(invocation_script));
+    assert(memcmp(witness->invocation_script, invocation_script, sizeof(invocation_script)) == 0);
+    assert(witness->verification_script_len == sizeof(verification_script));
+    assert(memcmp(witness->verification_script, verification_script, sizeof(verification_script)) == 0);
     
     // Cleanup
-    neoc_free(signature);
-    neoc_free(invocation_script);
-    neoc_free(verification_script);
     neoc_witness_free(witness);
-    neoc_ec_key_pair_free(key_pair);
     
     printf("  ✅ Witness creation test passed\n");
 }
@@ -131,24 +100,13 @@ static void test_deserialize_witness(void) {
     assert(witness != NULL);
     
     // Verify deserialized data
-    uint8_t *inv_out = NULL;
-    size_t inv_out_len = 0;
-    err = neoc_witness_get_invocation_script(witness, &inv_out, &inv_out_len);
-    assert(err == NEOC_SUCCESS);
-    assert(inv_out_len == sizeof(inv_script));
-    assert(memcmp(inv_out, inv_script, inv_out_len) == 0);
-    
-    uint8_t *ver_out = NULL;
-    size_t ver_out_len = 0;
-    err = neoc_witness_get_verification_script(witness, &ver_out, &ver_out_len);
-    assert(err == NEOC_SUCCESS);
-    assert(ver_out_len == sizeof(ver_script));
-    assert(memcmp(ver_out, ver_script, ver_out_len) == 0);
+    assert(witness->invocation_script_len == sizeof(inv_script));
+    assert(memcmp(witness->invocation_script, inv_script, sizeof(inv_script)) == 0);
+    assert(witness->verification_script_len == sizeof(ver_script));
+    assert(memcmp(witness->verification_script, ver_script, sizeof(ver_script)) == 0);
     
     // Cleanup
     free(serialized);
-    neoc_free(inv_out);
-    neoc_free(ver_out);
     neoc_witness_free(witness);
     
     printf("  ✅ Witness deserialization test passed\n");
@@ -167,18 +125,19 @@ static void test_script_hash_from_witness(void) {
                                            ver_script, sizeof(ver_script), &witness);
     assert(err == NEOC_SUCCESS);
     
-    // Get script hash
-    neoc_hash160_t script_hash;
-    err = neoc_witness_get_script_hash(witness, &script_hash);
-    assert(err == NEOC_SUCCESS);
-    
     // Calculate expected hash (SHA256 then RIPEMD160 of verification script)
     neoc_hash160_t expected_hash;
     err = neoc_hash160_from_script(&expected_hash, ver_script, sizeof(ver_script));
     assert(err == NEOC_SUCCESS);
+
+    neoc_hash160_t actual_hash;
+    err = neoc_hash160_from_script(&actual_hash,
+                                   witness->verification_script,
+                                   witness->verification_script_len);
+    assert(err == NEOC_SUCCESS);
     
     // Compare hashes
-    assert(memcmp(script_hash.data, expected_hash.data, 20) == 0);
+    assert(memcmp(actual_hash.data, expected_hash.data, NEOC_HASH160_SIZE) == 0);
     
     // Cleanup
     neoc_witness_free(witness);

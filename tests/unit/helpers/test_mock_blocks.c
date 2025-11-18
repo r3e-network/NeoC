@@ -115,7 +115,7 @@ void test_mock_block_clone_deep_copy(void) {
     neoc_neo_block_t *clone = neoc_neo_block_clone(block);
     TEST_ASSERT_NOT_NULL(clone);
     TEST_ASSERT_EQUAL_UINT32(block->transaction_count, clone->transaction_count);
-    TEST_ASSERT_NOT_EQUAL(block->transactions, clone->transactions);
+    TEST_ASSERT_TRUE(block->transactions != clone->transactions);
     TEST_ASSERT_NOT_NULL(clone->transactions[0]);
 
     TEST_ASSERT_EQUAL_UINT(block->transactions[0]->script_len,
@@ -125,8 +125,8 @@ void test_mock_block_clone_deep_copy(void) {
                              block->transactions[0]->script_len);
 
     block->transactions[0]->script[0] ^= 0xFF;
-    TEST_ASSERT_NOT_EQUAL(block->transactions[0]->script[0],
-                          clone->transactions[0]->script[0]);
+    TEST_ASSERT_TRUE(block->transactions[0]->script[0] !=
+                     clone->transactions[0]->script[0]);
 
     neoc_neo_block_free(clone);
 }
@@ -136,5 +136,5 @@ int main(void) {
     RUN_TEST(test_mock_block_creation_and_setters);
     RUN_TEST(test_mock_block_transactions_and_verification);
     RUN_TEST(test_mock_block_clone_deep_copy);
-    return UNITY_END();
+    return UnityEnd();
 }

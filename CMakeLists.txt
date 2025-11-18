@@ -78,6 +78,7 @@ list(APPEND SOURCES third_party/cjson/cJSON.c)
 # Remove incomplete RPC response stubs until they are fully implemented
 list(FILTER SOURCES EXCLUDE REGEX "/src/protocol/core/response/neo_get_.*\\.c$")
 list(FILTER SOURCES EXCLUDE REGEX "/src/protocol/core/response/.*\\.c$")
+list(FILTER SOURCES EXCLUDE REGEX "/src/protocol/response/.*\\.c$")
 list(FILTER SOURCES EXCLUDE REGEX "/src/transaction/neo_transaction\\.c$")
 list(FILTER SOURCES EXCLUDE REGEX "/src/crypto/sha256\\.c$")
 

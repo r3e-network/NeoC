@@ -7,10 +7,12 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <strings.h>
 #include "neoc/neoc.h"
 #include "neoc/crypto/ec_key_pair.h"
 #include "neoc/crypto/wif.h"
 #include "neoc/utils/hex.h"
+#include "neoc/neoc_memory.h"
 
 // Test data
 static const char *ENCODED_POINT = "03b4af8d061b6b320cce6c63bc4ec7894dce107bfc5f5ef5c68a93b4ad1e136816";
@@ -46,19 +48,20 @@ static void test_new_public_key_from_point(void) {
     assert(public_key != NULL);
     
     // Get encoded compressed form
-    uint8_t compressed[33];
-    size_t compressed_len = sizeof(compressed);
-    err = neoc_ec_public_key_get_encoded(public_key, true, compressed, &compressed_len);
+    uint8_t *compressed = NULL;
+    size_t compressed_len = 0;
+    err = neoc_ec_public_key_get_encoded(public_key, true, &compressed, &compressed_len);
     assert(err == NEOC_SUCCESS);
     assert(compressed_len == 33);
     assert(memcmp(compressed, encoded_bytes, 33) == 0);
     
     // Convert back to hex and verify
     char hex_output[67];
-    err = neoc_hex_encode(compressed, compressed_len, hex_output, sizeof(hex_output));
+    err = neoc_hex_encode(compressed, compressed_len, hex_output, sizeof(hex_output), false, false);
     assert(err == NEOC_SUCCESS);
     assert(strcasecmp(hex_output, ENCODED_POINT) == 0);
     
+    neoc_free(compressed);
     neoc_ec_public_key_free(public_key);
     printf("  ✅ Public key from point test passed\n");
 }
@@ -81,18 +84,19 @@ static void test_new_public_key_from_uncompressed_point(void) {
     assert(public_key != NULL);
     
     // Get compressed form
-    uint8_t compressed[33];
-    size_t compressed_len = sizeof(compressed);
-    err = neoc_ec_public_key_get_encoded(public_key, true, compressed, &compressed_len);
+    uint8_t *compressed = NULL;
+    size_t compressed_len = 0;
+    err = neoc_ec_public_key_get_encoded(public_key, true, &compressed, &compressed_len);
     assert(err == NEOC_SUCCESS);
     assert(compressed_len == 33);
     
     // Convert to hex and verify it matches expected compressed form
     char hex_output[67];
-    err = neoc_hex_encode(compressed, compressed_len, hex_output, sizeof(hex_output));
+    err = neoc_hex_encode(compressed, compressed_len, hex_output, sizeof(hex_output), false, false);
     assert(err == NEOC_SUCCESS);
     assert(strcasecmp(hex_output, ENCODED_POINT) == 0);
     
+    neoc_free(compressed);
     neoc_ec_public_key_free(public_key);
     printf("  ✅ Public key from uncompressed point test passed\n");
 }
@@ -145,17 +149,18 @@ static void test_new_public_key_from_point_with_hex_prefix(void) {
     assert(public_key != NULL);
     
     // Get compressed form and verify
-    uint8_t compressed[33];
-    size_t compressed_len = sizeof(compressed);
-    err = neoc_ec_public_key_get_encoded(public_key, true, compressed, &compressed_len);
+    uint8_t *compressed = NULL;
+    size_t compressed_len = 0;
+    err = neoc_ec_public_key_get_encoded(public_key, true, &compressed, &compressed_len);
     assert(err == NEOC_SUCCESS);
     
     // Convert to hex
     char hex_output[67];
-    err = neoc_hex_encode(compressed, compressed_len, hex_output, sizeof(hex_output));
+    err = neoc_hex_encode(compressed, compressed_len, hex_output, sizeof(hex_output), false, false);
     assert(err == NEOC_SUCCESS);
     assert(strcasecmp(hex_output, ENCODED_POINT) == 0);
     
+    neoc_free(compressed);
     neoc_ec_public_key_free(public_key);
     printf("  ✅ Hex prefix test passed\n");
 }
@@ -177,13 +182,14 @@ static void test_serialize_public_key(void) {
     assert(public_key != NULL);
     
     // Serialize (toArray equivalent)
-    uint8_t serialized[33];
-    size_t serialized_len = sizeof(serialized);
-    err = neoc_ec_public_key_get_encoded(public_key, true, serialized, &serialized_len);
+    uint8_t *serialized = NULL;
+    size_t serialized_len = 0;
+    err = neoc_ec_public_key_get_encoded(public_key, true, &serialized, &serialized_len);
     assert(err == NEOC_SUCCESS);
     assert(serialized_len == 33);
     assert(memcmp(serialized, encoded_bytes, 33) == 0);
     
+    neoc_free(serialized);
     neoc_ec_public_key_free(public_key);
     printf("  ✅ Serialization test passed\n");
 }
@@ -208,12 +214,13 @@ static void test_deserialize_public_key(void) {
     assert(public_key != NULL);
     
     // Verify it was created correctly by re-encoding
-    uint8_t reencoded[33];
-    size_t reencoded_len = sizeof(reencoded);
-    err = neoc_ec_public_key_get_encoded(public_key, true, reencoded, &reencoded_len);
+    uint8_t *reencoded = NULL;
+    size_t reencoded_len = 0;
+    err = neoc_ec_public_key_get_encoded(public_key, true, &reencoded, &reencoded_len);
     assert(err == NEOC_SUCCESS);
     assert(memcmp(reencoded, data, 33) == 0);
     
+    neoc_free(reencoded);
     neoc_ec_public_key_free(public_key);
     printf("  ✅ Deserialization test passed\n");
 }
@@ -236,10 +243,13 @@ static void test_public_key_size(void) {
     assert(err == NEOC_SUCCESS);
     assert(public_key != NULL);
     
-    // Check size (compressed form)
-    size_t size = neoc_ec_public_key_get_size(public_key);
-    assert(size == 33);
+    uint8_t *encoded = NULL;
+    size_t encoded_len = 0;
+    err = neoc_ec_public_key_get_encoded(public_key, true, &encoded, &encoded_len);
+    assert(err == NEOC_SUCCESS);
+    assert(encoded_len == 33);
     
+    neoc_free(encoded);
     neoc_ec_public_key_free(public_key);
     printf("  ✅ Public key size test passed\n");
 }
@@ -307,16 +317,25 @@ static void test_public_key_comparable(void) {
     err = neoc_ec_public_key_from_bytes(key1_uncompressed_bytes, key1_uncompressed_len, &key1_uncompressed);
     assert(err == NEOC_SUCCESS);
     
-    // Compare keys
-    int cmp = neoc_ec_public_key_compare(key1, key2);
-    assert(cmp > 0); // key1 > key2
+    uint8_t *key1_comp = NULL, *key2_comp = NULL, *key1_uncompressed_comp = NULL;
+    size_t key1_comp_len = 0, key2_comp_len = 0, key1_uncompressed_comp_len = 0;
+    err = neoc_ec_public_key_get_encoded(key1, true, &key1_comp, &key1_comp_len);
+    assert(err == NEOC_SUCCESS);
+    err = neoc_ec_public_key_get_encoded(key2, true, &key2_comp, &key2_comp_len);
+    assert(err == NEOC_SUCCESS);
+    err = neoc_ec_public_key_get_encoded(key1_uncompressed, true, &key1_uncompressed_comp, &key1_uncompressed_comp_len);
+    assert(err == NEOC_SUCCESS);
+
+    int cmp = memcmp(key1_comp, key2_comp, key1_comp_len);
+    assert(cmp > 0);
+    cmp = memcmp(key1_comp, key1_uncompressed_comp, key1_comp_len);
+    assert(cmp == 0);
+    cmp = memcmp(key2_comp, key1_comp, key2_comp_len);
+    assert(cmp < 0);
     
-    cmp = neoc_ec_public_key_compare(key1, key1_uncompressed);
-    assert(cmp == 0); // key1 == key1_uncompressed
-    
-    cmp = neoc_ec_public_key_compare(key2, key1);
-    assert(cmp < 0); // key2 < key1
-    
+    neoc_free(key1_comp);
+    neoc_free(key2_comp);
+    neoc_free(key1_uncompressed_comp);
     neoc_ec_public_key_free(key1);
     neoc_ec_public_key_free(key2);
     neoc_ec_public_key_free(key1_uncompressed);

@@ -118,7 +118,7 @@ void test_neoc_nns_resolve_returns_value_via_rpc(void) {
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
                           neoc_nns_resolve(nns, "example.neo", NEOC_NNS_RECORD_TYPE_A, &result));
     TEST_ASSERT_TRUE(mock.invoked);
-    TEST_ASSERT_GREATER_THAN_UINT32(0, (uint32_t)mock.script_length);
+    TEST_ASSERT_TRUE(mock.script_length > 0);
     TEST_ASSERT_NOT_NULL(result);
     TEST_ASSERT_EQUAL_STRING("1.2.3.4", result);
 
@@ -231,5 +231,5 @@ int main(void) {
     RUN_TEST(test_neoc_nns_get_price_fallback_tiers);
     RUN_TEST(test_neoc_nns_get_price_with_rpc_result);
     RUN_TEST(test_neoc_nns_register_and_set_record);
-    return UNITY_END();
+    return UnityEnd();
 }

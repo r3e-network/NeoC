@@ -83,5 +83,5 @@ int main(void) {
     RUN_TEST(test_http_request_headers_and_body_string);
     RUN_TEST(test_http_request_body_from_byte_array);
     RUN_TEST(test_http_request_invalid_arguments);
-    return UNITY_END();
+    return UnityEnd();
 }

@@ -120,5 +120,5 @@ int main(void) {
     RUN_TEST(test_gas_token_metadata);
     RUN_TEST(test_gas_token_transfer_script_builders);
     RUN_TEST(test_gas_token_supported_methods);
-    return UNITY_END();
+    return UnityEnd();
 }

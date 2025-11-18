@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include "neoc/neoc.h"
 #include "neoc/crypto/nep2.h"
-#include "neoc/crypto/ec_key_pair.h"
-#include "neoc/crypto/scrypt_params.h"
 #include "neoc/utils/hex.h"
 
 // Test data from TestProperties.swift
@@ -36,11 +34,11 @@ static void test_decrypt_with_default_scrypt_params(void) {
     // Decrypt the encrypted private key
     uint8_t decrypted_private_key[32];
     neoc_error_t err = neoc_nep2_decrypt(
-        DEFAULT_PASSWORD,
         DEFAULT_ENCRYPTED_KEY,
-        NULL,  // Use default scrypt params
-        decrypted_private_key
-    );
+        DEFAULT_PASSWORD,
+        NULL,
+        decrypted_private_key,
+        sizeof(decrypted_private_key));
     assert(err == NEOC_SUCCESS);
     
     // Convert expected private key from hex
@@ -61,21 +59,18 @@ static void test_decrypt_with_non_default_scrypt_params(void) {
     printf("Testing NEP2 decrypt with non-default scrypt params...\n");
     
     // Create non-default scrypt params (N=256, r=1, p=1)
-    neoc_scrypt_params_t params;
-    params.n = 256;
-    params.r = 1;
-    params.p = 1;
+    neoc_nep2_params_t params = {256, 1, 1};
     
     const char *encrypted = "6PYM7jHL3uwhP8uuHP9fMGMfJxfyQbanUZPQEh1772iyb7vRnUkbkZmdRT";
     
     // Decrypt the encrypted private key
     uint8_t decrypted_private_key[32];
     neoc_error_t err = neoc_nep2_decrypt(
-        DEFAULT_PASSWORD,
         encrypted,
+        DEFAULT_PASSWORD,
         &params,
-        decrypted_private_key
-    );
+        decrypted_private_key,
+        sizeof(decrypted_private_key));
     assert(err == NEOC_SUCCESS);
     
     // Convert expected private key from hex
@@ -102,28 +97,15 @@ static void test_encrypt_with_default_scrypt_params(void) {
     assert(err == NEOC_SUCCESS);
     assert(private_key_len == 32);
     
-    // Create EC key pair from private key
-    neoc_ec_key_pair_t *key_pair = NULL;
-    err = neoc_ec_key_pair_create_from_private_key(private_key, &key_pair);
-    assert(err == NEOC_SUCCESS);
-    assert(key_pair != NULL);
-    
-    // Encrypt the private key
-    char *encrypted = NULL;
+    char encrypted[128];
     err = neoc_nep2_encrypt(
+        private_key,
         DEFAULT_PASSWORD,
-        key_pair,
-        NULL,  // Use default scrypt params
-        &encrypted
-    );
+        NULL,
+        encrypted,
+        sizeof(encrypted));
     assert(err == NEOC_SUCCESS);
-    assert(encrypted != NULL);
-    
-    // Compare with expected encrypted key
     assert(strcmp(encrypted, DEFAULT_ENCRYPTED_KEY) == 0);
-    
-    free(encrypted);
-    neoc_ec_key_pair_free(key_pair);
     
     printf("  ✅ NEP2 encrypt with default scrypt params test passed\n");
 }
@@ -133,10 +115,7 @@ static void test_encrypt_with_non_default_scrypt_params(void) {
     printf("Testing NEP2 encrypt with non-default scrypt params...\n");
     
     // Create non-default scrypt params (N=256, r=1, p=1)
-    neoc_scrypt_params_t params;
-    params.n = 256;
-    params.r = 1;
-    params.p = 1;
+    neoc_nep2_params_t params = {256, 1, 1};
     
     const char *expected = "6PYM7jHL3uwhP8uuHP9fMGMfJxfyQbanUZPQEh1772iyb7vRnUkbkZmdRT";
     
@@ -147,28 +126,15 @@ static void test_encrypt_with_non_default_scrypt_params(void) {
     assert(err == NEOC_SUCCESS);
     assert(private_key_len == 32);
     
-    // Create EC key pair from private key
-    neoc_ec_key_pair_t *key_pair = NULL;
-    err = neoc_ec_key_pair_create_from_private_key(private_key, &key_pair);
-    assert(err == NEOC_SUCCESS);
-    assert(key_pair != NULL);
-    
-    // Encrypt the private key
-    char *encrypted = NULL;
+    char encrypted[128];
     err = neoc_nep2_encrypt(
+        private_key,
         DEFAULT_PASSWORD,
-        key_pair,
         &params,
-        &encrypted
-    );
+        encrypted,
+        sizeof(encrypted));
     assert(err == NEOC_SUCCESS);
-    assert(encrypted != NULL);
-    
-    // Compare with expected encrypted key
     assert(strcmp(encrypted, expected) == 0);
-    
-    free(encrypted);
-    neoc_ec_key_pair_free(key_pair);
     
     printf("  ✅ NEP2 encrypt with non-default scrypt params test passed\n");
 }

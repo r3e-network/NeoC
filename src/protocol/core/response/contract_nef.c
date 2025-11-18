@@ -28,27 +28,43 @@ neoc_error_t neoc_contract_nef_create(neoc_contract_nef_t **nef) {
 }
 
 
-// Free contract NEF
-void neoc_contract_nef_free(neoc_contract_nef_t* nef) {
+void neoc_contract_nef_dispose(neoc_contract_nef_t* nef) {
     if (!nef) {
         return;
     }
     
     if (nef->compiler) {
         neoc_free(nef->compiler);
+        nef->compiler = NULL;
     }
     
     if (nef->source) {
         neoc_free(nef->source);
+        nef->source = NULL;
     }
     
     if (nef->script) {
         neoc_free(nef->script);
+        nef->script = NULL;
+        nef->script_length = 0;
     }
     
     if (nef->tokens) {
         neoc_free(nef->tokens);
+        nef->tokens = NULL;
+        nef->token_count = 0;
     }
+    
+    nef->checksum = 0;
+}
+
+// Free contract NEF
+void neoc_contract_nef_free(neoc_contract_nef_t* nef) {
+    if (!nef) {
+        return;
+    }
+    
+    neoc_contract_nef_dispose(nef);
     
     neoc_free(nef);
 }

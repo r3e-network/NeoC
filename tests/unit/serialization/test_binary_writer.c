@@ -12,6 +12,7 @@
 #include "neoc/neoc.h"
 #include "neoc/serialization/binary_writer.h"
 #include "neoc/utils/hex.h"
+#include "neoc/neoc_memory.h"
 
 // Test setup
 static void setUp(void) {
@@ -45,17 +46,23 @@ static void verify_writer_output(neoc_binary_writer_t *writer, const char *expec
     assert(data_len == expected_len);
     assert(memcmp(data, expected, expected_len) == 0);
     
-    free(data);
+    neoc_free(data);
     free(expected);
+}
+
+static neoc_binary_writer_t *create_writer(void) {
+    neoc_binary_writer_t *writer = NULL;
+    neoc_error_t err = neoc_binary_writer_create(64, true, &writer);
+    assert(err == NEOC_SUCCESS);
+    return writer;
 }
 
 // Test write uint32
 static void test_write_uint32(void) {
     printf("Testing write uint32...\n");
     
-    neoc_binary_writer_t *writer = NULL;
-    neoc_error_t err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
+    neoc_error_t err;
     
     // Test max uint32 value (2^32 - 1)
     err = neoc_binary_writer_write_uint32(writer, UINT32_MAX);
@@ -83,9 +90,8 @@ static void test_write_uint32(void) {
 static void test_write_int64(void) {
     printf("Testing write int64...\n");
     
-    neoc_binary_writer_t *writer = NULL;
-    neoc_error_t err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
+    neoc_error_t err;
     
     // Test INT64_MAX
     err = neoc_binary_writer_write_int64(writer, INT64_MAX);
@@ -119,9 +125,8 @@ static void test_write_int64(void) {
 static void test_write_uint16(void) {
     printf("Testing write uint16...\n");
     
-    neoc_binary_writer_t *writer = NULL;
-    neoc_error_t err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
+    neoc_error_t err;
     
     // Test max uint16 value (2^16 - 1)
     err = neoc_binary_writer_write_uint16(writer, UINT16_MAX);
@@ -149,9 +154,8 @@ static void test_write_uint16(void) {
 static void test_write_var_int(void) {
     printf("Testing write var int...\n");
     
-    neoc_binary_writer_t *writer = NULL;
-    neoc_error_t err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
+    neoc_error_t err;
     
     // Test v == 0, encode with one byte
     err = neoc_binary_writer_write_var_int(writer, 0);
@@ -221,9 +225,8 @@ static void test_write_var_int(void) {
 static void test_write_var_bytes(void) {
     printf("Testing write var bytes...\n");
     
-    neoc_binary_writer_t *writer = NULL;
-    neoc_error_t err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
+    neoc_error_t err;
     
     // Test small byte array
     uint8_t small_data[] = {0x01, 0x02, 0x03};
@@ -258,9 +261,8 @@ static void test_write_var_bytes(void) {
 static void test_write_var_string(void) {
     printf("Testing write var string...\n");
     
-    neoc_binary_writer_t *writer = NULL;
-    neoc_error_t err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
+    neoc_error_t err;
     
     // Test "hello, world!"
     err = neoc_binary_writer_write_var_string(writer, "hello, world!");
@@ -293,9 +295,8 @@ static void test_write_var_string(void) {
 static void test_write_bytes(void) {
     printf("Testing write bytes...\n");
     
-    neoc_binary_writer_t *writer = NULL;
-    neoc_error_t err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
+    neoc_error_t err;
     
     // Write some bytes
     uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05};
@@ -317,9 +318,8 @@ static void test_write_bytes(void) {
 static void test_writer_reset(void) {
     printf("Testing writer reset...\n");
     
-    neoc_binary_writer_t *writer = NULL;
-    neoc_error_t err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
+    neoc_error_t err;
     
     // Write some data
     err = neoc_binary_writer_write_uint32(writer, 12345);
@@ -327,7 +327,7 @@ static void test_writer_reset(void) {
     verify_writer_output(writer, "39300000");
     
     // Reset writer
-    err = neoc_binary_writer_reset(writer);
+    neoc_binary_writer_reset(writer);
     assert(err == NEOC_SUCCESS);
     
     // Verify writer is empty

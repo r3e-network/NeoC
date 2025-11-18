@@ -69,7 +69,7 @@ static void test_ripemd160_vectors(void) {
         
         // Convert to hex
         char hash_hex[41];
-        err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex));
+        err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex), false, false);
         assert(err == NEOC_SUCCESS);
         
         // Compare
@@ -85,7 +85,7 @@ static void test_ripemd160_vectors(void) {
     free(repeated);
     
     char hash_hex[41];
-    err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex));
+    err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex), false, false);
     assert(err == NEOC_SUCCESS);
     assert(strcmp(hash_hex, "9b752e45573d4b39f4dbd3323cab82bf63326bfb") == 0);
     printf("  Test vector 8 (repeated) passed\n");
@@ -96,7 +96,7 @@ static void test_ripemd160_vectors(void) {
     assert(err == NEOC_SUCCESS);
     free(million_a);
     
-    err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex));
+    err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex), false, false);
     assert(err == NEOC_SUCCESS);
     assert(strcmp(hash_hex, "52783243c1697bdbe16d37f97f68f08325dc1528") == 0);
     printf("  Test vector 9 (million a's) passed\n");
@@ -113,7 +113,7 @@ static void test_ripemd160_empty(void) {
     assert(err == NEOC_SUCCESS);
     
     char hash_hex[41];
-    err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex));
+    err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex), false, false);
     assert(err == NEOC_SUCCESS);
     
     assert(strcmp(hash_hex, "9c1185a5c5e9fc54612808977ee8f548b2258d31") == 0);
@@ -131,7 +131,7 @@ static void test_ripemd160_single_byte(void) {
     assert(err == NEOC_SUCCESS);
     
     char hash_hex[41];
-    err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex));
+    err = neoc_hex_encode(hash, 20, hash_hex, sizeof(hash_hex), false, false);
     assert(err == NEOC_SUCCESS);
     
     assert(strcmp(hash_hex, "0bdc9d2d256b3ee9daae347be6f4dc835a467ffe") == 0);

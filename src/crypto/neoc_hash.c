@@ -91,7 +91,7 @@ neoc_error_t neoc_sha256_double(const uint8_t* data, size_t data_length, uint8_t
 }
 
 neoc_error_t neoc_ripemd160(const uint8_t* data, size_t data_length, uint8_t digest[NEOC_RIPEMD160_DIGEST_LENGTH]) {
-    if (!data || !digest) {
+    if ((!data && data_length > 0) || !digest) {
         return NEOC_ERROR_NULL_POINTER;
     }
     

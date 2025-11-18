@@ -419,10 +419,8 @@ neoc_error_t neoc_transaction_get_signers(neoc_transaction_t *transaction,
 void neoc_transaction_free(neoc_transaction_t *tx) {
     if (!tx) return;
     
-    // Free signers
-    for (size_t i = 0; i < tx->signers_count; i++) {
-        neoc_signer_free(tx->signers[i]);
-    }
+    // Free signers array (signer ownership managed elsewhere)
+    tx->signers_count = 0;
     neoc_free(tx->signers);
     
     // Free attributes

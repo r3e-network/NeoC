@@ -57,7 +57,7 @@ static void test_read_push_data_bytes(void) {
     neoc_binary_reader_free(reader);
     
     // Test case 2: 255 bytes with PUSHDATA1
-    char hex[512] = "0cff";
+    char hex[600] = "0cff";
     for (int i = 0; i < 255; i++) {
         strcat(hex, "01");
     }
@@ -136,29 +136,29 @@ static void test_read_push_data_big_integer(void) {
     
     // Test PUSH0 (0x10) = 0
     neoc_binary_reader_t *reader = create_reader_from_hex("10");
-    int64_t value = 0;
-    neoc_error_t err = neoc_binary_reader_read_push_integer(reader, &value);
+    int32_t value = 0;
+    neoc_error_t err = neoc_binary_reader_read_push_int(reader, &value);
     assert(err == NEOC_SUCCESS);
     assert(value == 0);
     neoc_binary_reader_free(reader);
     
     // Test PUSH1 (0x11) = 1
     reader = create_reader_from_hex("11");
-    err = neoc_binary_reader_read_push_integer(reader, &value);
+    err = neoc_binary_reader_read_push_int(reader, &value);
     assert(err == NEOC_SUCCESS);
     assert(value == 1);
     neoc_binary_reader_free(reader);
     
     // Test PUSHM1 (0x0f) = -1
     reader = create_reader_from_hex("0f");
-    err = neoc_binary_reader_read_push_integer(reader, &value);
+    err = neoc_binary_reader_read_push_int(reader, &value);
     assert(err == NEOC_SUCCESS);
     assert(value == -1);
     neoc_binary_reader_free(reader);
     
     // Test PUSH16 (0x20) = 16
     reader = create_reader_from_hex("20");
-    err = neoc_binary_reader_read_push_integer(reader, &value);
+    err = neoc_binary_reader_read_push_int(reader, &value);
     assert(err == NEOC_SUCCESS);
     assert(value == 16);
     neoc_binary_reader_free(reader);
@@ -228,12 +228,11 @@ static void test_read_int64(void) {
     assert(value == 0);
     neoc_binary_reader_free(reader);
     
-    // Test 749675361041 (0xae8c22331100 in little endian)
+    // Test parsed little-endian integer
     reader = create_reader_from_hex("113322ae8c000000");
     err = neoc_binary_reader_read_int64(reader, &value);
     assert(err == NEOC_SUCCESS);
-    // Note: Adjusted expected value to match little-endian bytes
-    assert(value == 749675361041LL);
+    assert(value == 604216898321LL);
     neoc_binary_reader_free(reader);
     
     printf("  ✅ Read int64 test passed\n");

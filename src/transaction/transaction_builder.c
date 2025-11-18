@@ -152,6 +152,17 @@ neoc_error_t neoc_tx_builder_add_signer(neoc_tx_builder_t *builder,
     if (builder->signer_count >= TX_BUILDER_MAX_SIGNERS) {
         return neoc_error_set(NEOC_ERROR_INVALID_SIZE, "Too many signers");
     }
+
+    // Prevent duplicate signers (same account hash)
+    for (size_t i = 0; i < builder->signer_count; i++) {
+        neoc_hash160_t existing_hash;
+        neoc_hash160_t new_hash;
+        if (neoc_signer_get_account(builder->signers[i], &existing_hash) == NEOC_SUCCESS &&
+            neoc_signer_get_account(signer, &new_hash) == NEOC_SUCCESS &&
+            memcmp(&existing_hash, &new_hash, sizeof(neoc_hash160_t)) == 0) {
+            return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Duplicate signer");
+        }
+    }
     
     // Create a copy of the signer
     neoc_signer_t *new_signer = NULL;
@@ -441,7 +452,7 @@ neoc_error_t neoc_tx_builder_build_unsigned(neoc_tx_builder_t *builder,
     neoc_transaction_set_network_fee(*transaction, builder->network_fee);
     neoc_transaction_set_script(*transaction, builder->script, builder->script_size);
     
-    // Add signers
+    // Add signers (transfer ownership to transaction)
     for (size_t i = 0; i < builder->signer_count; i++) {
         err = neoc_transaction_add_signer(*transaction, builder->signers[i]);
         if (err != NEOC_SUCCESS) {
@@ -453,10 +464,7 @@ neoc_error_t neoc_tx_builder_build_unsigned(neoc_tx_builder_t *builder,
     }
     builder->signer_count = 0;
     
-    // Store reference to built transaction
-    if (builder->built_transaction) {
-        neoc_transaction_free(builder->built_transaction);
-    }
+    // Store reference to built transaction (caller owns lifetime)
     builder->built_transaction = *transaction;
     
     return NEOC_SUCCESS;

@@ -6,6 +6,7 @@
 #endif
 #include "../../../include/neoc/protocol/response/contract_state.h"
 #include "../../../include/neoc/protocol/contract_response_types.h"
+#include "../../../include/neoc/protocol/response/contract_nef.h"
 #include "../../../include/neoc/contract/contract_manifest.h"
 #include "../../../include/neoc/neoc_memory.h"
 #include "../../../include/neoc/utils/neoc_hex.h"
@@ -34,20 +35,8 @@ void neoc_contract_state_free(neoc_contract_state_t* state) {
         return;
     }
     
-    // Free embedded structures' allocated members
-    // NEF structure
-    if (state->nef.compiler) {
-        neoc_free(state->nef.compiler);
-    }
-    if (state->nef.script) {
-        neoc_free(state->nef.script);
-    }
-    if (state->nef.tokens) {
-        neoc_free(state->nef.tokens);
-    }
-    
-    // Manifest structure - call cleanup function
-    neoc_contract_manifest_free(&state->manifest);
+    neoc_contract_nef_dispose(&state->nef);
+    neoc_contract_manifest_dispose(&state->manifest);
     
     neoc_free(state);
 }

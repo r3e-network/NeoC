@@ -10,11 +10,11 @@
 #include <stdint.h>
 #include "neoc/neoc.h"
 #include "neoc/script/script_builder.h"
-#include "neoc/script/op_code.h"
+#include "neoc/script/script_builder_full.h"
+#include "neoc/script/opcode.h"
 #include "neoc/script/interop_service.h"
-#include "neoc/types/contract_parameter.h"
-#include "neoc/crypto/ec_key_pair.h"
 #include "neoc/utils/hex.h"
+#include "neoc/neoc_memory.h"
 
 // Helper function to create byte array of specific size
 static uint8_t *create_byte_array(size_t size, uint8_t fill_value) {
@@ -22,6 +22,14 @@ static uint8_t *create_byte_array(size_t size, uint8_t fill_value) {
     assert(array != NULL);
     memset(array, fill_value, size);
     return array;
+}
+
+static uint8_t *builder_to_script(neoc_script_builder_t *builder, size_t *script_len) {
+    uint8_t *script = NULL;
+    neoc_error_t err = neoc_script_builder_to_array(builder, &script, script_len);
+    assert(err == NEOC_SUCCESS);
+    assert(script != NULL);
+    return script;
 }
 
 // Test setup
@@ -45,16 +53,15 @@ static void test_push_array_empty(void) {
     assert(builder != NULL);
     
     // Push empty array
-    neoc_contract_parameter_t *params[0];
-    err = neoc_script_builder_push_array(builder, params, 0);
+    err = neoc_script_builder_push_params(builder, NULL, 0);
     assert(err == NEOC_SUCCESS);
     
     // Get script and verify
     size_t script_len = 0;
-    const uint8_t *script = neoc_script_builder_to_array(builder, &script_len);
-    assert(script != NULL);
+    uint8_t *script = builder_to_script(builder, &script_len);
     assert(script_len == 1);
-    assert(script[0] == NEOC_OPCODE_NEWARRAY0);
+    assert(script[0] == NEOC_OP_NEWARRAY0);
+    neoc_free(script);
     
     neoc_script_builder_free(builder);
     printf("  ✅ Push empty array test passed\n");
@@ -74,10 +81,11 @@ static void test_push_byte_array(void) {
     assert(err == NEOC_SUCCESS);
     
     size_t script_len = 0;
-    const uint8_t *script = neoc_script_builder_to_array(builder, &script_len);
-    assert(script_len >= 2);
-    assert(script[0] == 0x0c); // PUSHDATA1 prefix for small data
+    uint8_t *script = builder_to_script(builder, &script_len);
+    assert(script_len == 3);
+    assert(script[0] == NEOC_OP_PUSHDATA1); // PUSHDATA1 prefix for small data
     assert(script[1] == 0x01); // Length
+    neoc_free(script);
     
     free(data1);
     neoc_script_builder_reset(builder);
@@ -87,10 +95,11 @@ static void test_push_byte_array(void) {
     err = neoc_script_builder_push_data(builder, data75, 75);
     assert(err == NEOC_SUCCESS);
     
-    script = neoc_script_builder_to_array(builder, &script_len);
-    assert(script_len >= 2);
-    assert(script[0] == 0x0c);
+    script = builder_to_script(builder, &script_len);
+    assert(script_len == 77);
+    assert(script[0] == NEOC_OP_PUSHDATA1);
     assert(script[1] == 0x4b); // 75 in hex
+    neoc_free(script);
     
     free(data75);
     neoc_script_builder_reset(builder);
@@ -100,9 +109,12 @@ static void test_push_byte_array(void) {
     err = neoc_script_builder_push_data(builder, data256, 256);
     assert(err == NEOC_SUCCESS);
     
-    script = neoc_script_builder_to_array(builder, &script_len);
-    assert(script_len >= 3);
-    assert(script[0] == 0x0d); // PUSHDATA2 prefix for medium data
+    script = builder_to_script(builder, &script_len);
+    assert(script_len == 259);
+    assert(script[0] == NEOC_OP_PUSHDATA2); // PUSHDATA2 prefix for medium data
+    assert(script[1] == 0x00);
+    assert(script[2] == 0x01);
+    neoc_free(script);
     
     free(data256);
     neoc_script_builder_free(builder);
@@ -123,10 +135,10 @@ static void test_push_string(void) {
     assert(err == NEOC_SUCCESS);
     
     size_t script_len = 0;
-    const uint8_t *script = neoc_script_builder_to_array(builder, &script_len);
-    assert(script_len == 2);
-    assert(script[0] == 0x0c);
-    assert(script[1] == 0x00); // Empty string length
+    uint8_t *script = builder_to_script(builder, &script_len);
+    assert(script_len == 1);
+    assert(script[0] == NEOC_OP_PUSH0);
+    neoc_free(script);
     
     neoc_script_builder_reset(builder);
     
@@ -134,11 +146,12 @@ static void test_push_string(void) {
     err = neoc_script_builder_push_string(builder, "a");
     assert(err == NEOC_SUCCESS);
     
-    script = neoc_script_builder_to_array(builder, &script_len);
+    script = builder_to_script(builder, &script_len);
     assert(script_len == 3);
-    assert(script[0] == 0x0c);
+    assert(script[0] == NEOC_OP_PUSHDATA1);
     assert(script[1] == 0x01); // Length 1
     assert(script[2] == 'a');
+    neoc_free(script);
     
     neoc_script_builder_free(builder);
     printf("  ✅ Push string test passed\n");
@@ -157,33 +170,37 @@ static void test_push_integer(void) {
     assert(err == NEOC_SUCCESS);
     
     size_t script_len = 0;
-    const uint8_t *script = neoc_script_builder_to_array(builder, &script_len);
+    uint8_t *script = builder_to_script(builder, &script_len);
     assert(script_len >= 1);
-    assert(script[script_len - 1] == NEOC_OPCODE_PUSH0);
+    assert(script[script_len - 1] == NEOC_OP_PUSH0);
+    neoc_free(script);
     
     // Test push 1
     err = neoc_script_builder_push_integer(builder, 1);
     assert(err == NEOC_SUCCESS);
     
-    script = neoc_script_builder_to_array(builder, &script_len);
-    assert(script[script_len - 1] == NEOC_OPCODE_PUSH1);
+    script = builder_to_script(builder, &script_len);
+    assert(script[script_len - 1] == NEOC_OP_PUSH1);
+    neoc_free(script);
     
     // Test push 16
     err = neoc_script_builder_push_integer(builder, 16);
     assert(err == NEOC_SUCCESS);
     
-    script = neoc_script_builder_to_array(builder, &script_len);
-    assert(script[script_len - 1] == NEOC_OPCODE_PUSH16);
+    script = builder_to_script(builder, &script_len);
+    assert(script[script_len - 1] == NEOC_OP_PUSH16);
+    neoc_free(script);
     
     // Test push 17 (requires encoding)
     neoc_script_builder_reset(builder);
     err = neoc_script_builder_push_integer(builder, 17);
     assert(err == NEOC_SUCCESS);
     
-    script = neoc_script_builder_to_array(builder, &script_len);
+    script = builder_to_script(builder, &script_len);
     assert(script_len == 2);
-    assert(script[0] == 0x00); // Prefix for small int
+    assert(script[0] == NEOC_OP_PUSHINT8); // Prefix for small int
     assert(script[1] == 0x11); // 17 in hex
+    neoc_free(script);
     
     neoc_script_builder_free(builder);
     printf("  ✅ Push integer test passed\n");
@@ -208,30 +225,20 @@ static void test_verification_script_from_public_keys(void) {
     err = neoc_hex_decode(key3_hex, key3_bytes, sizeof(key3_bytes), &key3_len);
     assert(err == NEOC_SUCCESS);
     
-    neoc_ec_public_key_t *key1 = NULL, *key2 = NULL, *key3 = NULL;
-    err = neoc_ec_public_key_from_bytes(key1_bytes, key1_len, &key1);
-    assert(err == NEOC_SUCCESS);
-    err = neoc_ec_public_key_from_bytes(key2_bytes, key2_len, &key2);
-    assert(err == NEOC_SUCCESS);
-    err = neoc_ec_public_key_from_bytes(key3_bytes, key3_len, &key3);
-    assert(err == NEOC_SUCCESS);
+    const uint8_t *keys[] = {key1_bytes, key2_bytes, key3_bytes};
+    size_t key_lens[] = {key1_len, key2_len, key3_len};
     
-    // Build multi-sig verification script
-    neoc_ec_public_key_t *keys[3] = {key1, key2, key3};
     uint8_t *script = NULL;
     size_t script_len = 0;
-    err = neoc_script_builder_build_verification_script_multi(keys, 3, 2, &script, &script_len);
+    err = neoc_script_builder_build_multisig_script(2, keys, key_lens, 3, &script, &script_len);
     assert(err == NEOC_SUCCESS);
     assert(script != NULL);
     assert(script_len > 0);
     
     // Verify script starts with PUSH2 (for 2-of-3 multisig)
-    assert(script[0] == NEOC_OPCODE_PUSH2);
+    assert(script[0] == NEOC_OP_PUSH2);
     
-    free(script);
-    neoc_ec_public_key_free(key1);
-    neoc_ec_public_key_free(key2);
-    neoc_ec_public_key_free(key3);
+    neoc_free(script);
     
     printf("  ✅ Verification script from public keys test passed\n");
 }
@@ -257,12 +264,12 @@ static void test_verification_script_from_public_key(void) {
     assert(script_len > 0);
     
     // Verify script structure
-    assert(script[0] == NEOC_OPCODE_PUSHDATA1); // PUSHDATA1 for public key
+    assert(script[0] == NEOC_OP_PUSHDATA1); // PUSHDATA1 for public key
     assert(script[1] == 0x21); // 33 bytes length
     assert(memcmp(script + 2, key_bytes, 33) == 0); // Public key data
-    assert(script[35] == NEOC_OPCODE_SYSCALL); // SYSCALL opcode
+    assert(script[35] == NEOC_OP_SYSCALL); // SYSCALL opcode
     
-    free(script);
+    neoc_free(script);
     printf("  ✅ Verification script from single public key test passed\n");
 }
 
@@ -275,20 +282,22 @@ static void test_push_boolean(void) {
     assert(err == NEOC_SUCCESS);
     
     // Push true
-    err = neoc_script_builder_push_boolean(builder, true);
+    err = neoc_script_builder_push_bool(builder, true);
     assert(err == NEOC_SUCCESS);
     
     size_t script_len = 0;
-    const uint8_t *script = neoc_script_builder_to_array(builder, &script_len);
+    uint8_t *script = builder_to_script(builder, &script_len);
     assert(script_len >= 1);
-    assert(script[script_len - 1] == NEOC_OPCODE_PUSH1); // true is PUSH1
+    assert(script[script_len - 1] == NEOC_OP_PUSH1); // true is PUSH1
+    neoc_free(script);
     
     // Push false
-    err = neoc_script_builder_push_boolean(builder, false);
+    err = neoc_script_builder_push_bool(builder, false);
     assert(err == NEOC_SUCCESS);
     
-    script = neoc_script_builder_to_array(builder, &script_len);
-    assert(script[script_len - 1] == NEOC_OPCODE_PUSH0); // false is PUSH0
+    script = builder_to_script(builder, &script_len);
+    assert(script[script_len - 1] == NEOC_OP_PUSH0); // false is PUSH0
+    neoc_free(script);
     
     neoc_script_builder_free(builder);
     printf("  ✅ Push boolean test passed\n");
@@ -303,22 +312,23 @@ static void test_opcode_operations(void) {
     assert(err == NEOC_SUCCESS);
     
     // Add various opcodes
-    err = neoc_script_builder_opcode(builder, NEOC_OPCODE_NOP);
+    err = neoc_script_builder_emit(builder, NEOC_OP_NOP);
     assert(err == NEOC_SUCCESS);
     
-    err = neoc_script_builder_opcode(builder, NEOC_OPCODE_DUP);
+    err = neoc_script_builder_emit(builder, NEOC_OP_DUP);
     assert(err == NEOC_SUCCESS);
     
-    err = neoc_script_builder_opcode(builder, NEOC_OPCODE_DROP);
+    err = neoc_script_builder_emit(builder, NEOC_OP_DROP);
     assert(err == NEOC_SUCCESS);
     
     // Verify script
     size_t script_len = 0;
-    const uint8_t *script = neoc_script_builder_to_array(builder, &script_len);
+    uint8_t *script = builder_to_script(builder, &script_len);
     assert(script_len == 3);
-    assert(script[0] == NEOC_OPCODE_NOP);
-    assert(script[1] == NEOC_OPCODE_DUP);
-    assert(script[2] == NEOC_OPCODE_DROP);
+    assert(script[0] == NEOC_OP_NOP);
+    assert(script[1] == NEOC_OP_DUP);
+    assert(script[2] == NEOC_OP_DROP);
+    neoc_free(script);
     
     neoc_script_builder_free(builder);
     printf("  ✅ Opcode operations test passed\n");

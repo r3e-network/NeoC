@@ -1,6 +1,7 @@
 #include "neoc/script/script_builder_full.h"
 #include "neoc/contract/contract_parameter.h"
 #include "neoc/types/neoc_hash256.h"
+#include "neoc/script/interop_service.h"
 #include "neoc/neoc_memory.h"
 #include <string.h>
 
@@ -138,6 +139,72 @@ neoc_error_t neoc_script_builder_push_params(neoc_script_builder_t *builder,
         return err;
     }
     return neoc_script_builder_emit(builder, NEOC_OP_PACK);
+}
+
+neoc_error_t neoc_script_builder_build_multisig_script(int minimum_signatures,
+                                                       const uint8_t **public_keys,
+                                                       const size_t *public_key_lens,
+                                                       size_t public_key_count,
+                                                       uint8_t **script,
+                                                       size_t *script_len) {
+    if (!public_keys || !public_key_lens || !script || !script_len) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid multisig arguments");
+    }
+    if (public_key_count == 0 || minimum_signatures <= 0 ||
+        (size_t)minimum_signatures > public_key_count) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid multisig signature counts");
+    }
+
+    neoc_script_builder_t *builder = NULL;
+    neoc_error_t err = neoc_script_builder_create(&builder);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    err = neoc_script_builder_push_integer(builder, (int64_t)minimum_signatures);
+    if (err != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return err;
+    }
+
+    for (size_t i = 0; i < public_key_count; i++) {
+        if (!public_keys[i] || public_key_lens[i] == 0) {
+            neoc_script_builder_free(builder);
+            return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid public key");
+        }
+        err = neoc_script_builder_push_data(builder, public_keys[i], public_key_lens[i]);
+        if (err != NEOC_SUCCESS) {
+            neoc_script_builder_free(builder);
+            return err;
+        }
+    }
+
+    err = neoc_script_builder_push_integer(builder, (int64_t)public_key_count);
+    if (err != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return err;
+    }
+
+    err = neoc_script_builder_emit_syscall(builder, NEOC_INTEROP_SYSTEM_CRYPTO_CHECKMULTISIG);
+    if (err != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return err;
+    }
+
+    err = neoc_script_builder_to_array(builder, script, script_len);
+    neoc_script_builder_free(builder);
+
+    if (err != NEOC_SUCCESS && script) {
+        if (*script) {
+            neoc_free(*script);
+            *script = NULL;
+        }
+        if (script_len) {
+            *script_len = 0;
+        }
+    }
+
+    return err;
 }
 
 static neoc_error_t neoc_script_builder_push_array_internal(neoc_script_builder_t *builder,

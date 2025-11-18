@@ -1,4 +1,5 @@
 #include "neoc/serialization/binary_reader.h"
+#include "neoc/script/opcode.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -14,7 +15,15 @@ neoc_error_t neoc_binary_reader_create(const uint8_t *data,
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate binary reader");
     }
     
-    (*reader)->data = data;
+    uint8_t *copy = malloc(size);
+    if (!copy) {
+        free(*reader);
+        return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate reader buffer");
+    }
+    memcpy(copy, data, size);
+
+    (*reader)->data = copy;
+    (*reader)->owned_data = copy;
     (*reader)->size = size;
     (*reader)->position = 0;
     (*reader)->marker = SIZE_MAX; // No marker set initially
@@ -358,7 +367,7 @@ neoc_error_t neoc_binary_reader_read_push_data(neoc_binary_reader_t *reader,
 
     size_t size = 0;
     switch (byte) {
-        case 0x4C: // PUSHDATA1
+        case 0x0C: // PUSHDATA1
             {
                 uint8_t size8 = 0;
                 err = neoc_binary_reader_read_byte(reader, &size8);
@@ -366,7 +375,7 @@ neoc_error_t neoc_binary_reader_read_push_data(neoc_binary_reader_t *reader,
                 size = size8;
             }
             break;
-        case 0x4D: // PUSHDATA2
+        case 0x0D: // PUSHDATA2
             {
                 uint16_t size16 = 0;
                 err = neoc_binary_reader_read_uint16(reader, &size16);
@@ -374,7 +383,7 @@ neoc_error_t neoc_binary_reader_read_push_data(neoc_binary_reader_t *reader,
                 size = size16;
             }
             break;
-        case 0x4E: // PUSHDATA4
+        case 0x0E: // PUSHDATA4
             {
                 uint32_t size32 = 0;
                 err = neoc_binary_reader_read_uint32(reader, &size32);
@@ -538,9 +547,15 @@ neoc_error_t neoc_binary_reader_read_push_big_int(neoc_binary_reader_t *reader,
     neoc_error_t err = neoc_binary_reader_read_byte(reader, &byte);
     if (err != NEOC_SUCCESS) return err;
     
-    // Handle simple push opcodes (PUSH1-PUSH16, PUSHM1)
-    if (byte >= 0x51 && byte <= 0x60) { // PUSH1 - PUSH16
-        int32_t val = byte - 0x50;
+    // Handle simple push opcodes (PUSH0/PUSH1-PUSH16, PUSHM1)
+    if (byte == NEOC_OP_PUSH0) {
+        *data = NULL;
+        *len = 0;
+        *is_negative = false;
+        return NEOC_SUCCESS;
+    }
+    if (byte >= NEOC_OP_PUSH1 && byte <= NEOC_OP_PUSH16) { // 0x11 - 0x20
+        int32_t val = (int32_t)(byte - NEOC_OP_PUSH1 + 1);
         *len = sizeof(int32_t);
         *data = malloc(*len);
         if (!*data) {
@@ -550,7 +565,7 @@ neoc_error_t neoc_binary_reader_read_push_big_int(neoc_binary_reader_t *reader,
         return NEOC_SUCCESS;
     }
     
-    if (byte == 0x4F) { // PUSHM1
+    if (byte == NEOC_OP_PUSHM1) { // 0x0F
         *is_negative = true;
         *len = sizeof(int32_t);
         *data = malloc(*len);
@@ -564,22 +579,22 @@ neoc_error_t neoc_binary_reader_read_push_big_int(neoc_binary_reader_t *reader,
     // Handle PUSHINT opcodes
     int count = -1;
     switch (byte) {
-        case 0x00: // PUSHINT8
+        case NEOC_OP_PUSHINT8: // 0x00
             count = 1;
             break;
-        case 0x01: // PUSHINT16
+        case NEOC_OP_PUSHINT16:
             count = 2;
             break;
-        case 0x02: // PUSHINT32
+        case NEOC_OP_PUSHINT32:
             count = 4;
             break;
-        case 0x03: // PUSHINT64
+        case NEOC_OP_PUSHINT64:
             count = 8;
             break;
-        case 0x04: // PUSHINT128
+        case NEOC_OP_PUSHINT128:
             count = 16;
             break;
-        case 0x05: // PUSHINT256
+        case NEOC_OP_PUSHINT256:
             count = 32;
             break;
         default:
@@ -610,6 +625,10 @@ neoc_error_t neoc_binary_reader_read_push_big_int(neoc_binary_reader_t *reader,
 
 void neoc_binary_reader_free(neoc_binary_reader_t *reader) {
     if (reader) {
+        if (reader->owned_data) {
+            free(reader->owned_data);
+            reader->owned_data = NULL;
+        }
         free(reader);
     }
 }

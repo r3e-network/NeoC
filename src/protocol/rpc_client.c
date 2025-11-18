@@ -636,10 +636,8 @@ void neoc_rpc_transaction_free(neoc_rpc_transaction_t *transaction) {
 void neoc_rpc_contract_state_free(neoc_contract_state_t *state) {
     if (!state) return;
     
-    // NEF and manifest are embedded structs, not pointers
-    // Free their internal allocated memory if needed
-    neoc_contract_nef_free(&state->nef);
-    neoc_contract_manifest_free(&state->manifest);
+    neoc_contract_nef_dispose(&state->nef);
+    neoc_contract_manifest_dispose(&state->manifest);
     neoc_free(state);
 }
 

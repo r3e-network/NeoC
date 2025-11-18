@@ -10,16 +10,14 @@
 #include "neoc/neoc.h"
 #include "neoc/witnessrule/witness_rule.h"
 #include "neoc/witnessrule/witness_condition.h"
-#include "neoc/crypto/ec_key_pair.h"
-#include "neoc/types/hash160.h"
-#include "neoc/serialization/binary_writer.h"
+#include "neoc/crypto/ec_public_key.h"
+#include "neoc/neo_constants.h"
 #include "neoc/serialization/binary_reader.h"
+#include "neoc/serialization/binary_writer.h"
+#include "neoc/types/neoc_hash160.h"
 #include "neoc/utils/hex.h"
 
 // Test data
-static const char *DEFAULT_ACCOUNT_PUBLIC_KEY = "031b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f";
-static const char *DEFAULT_ACCOUNT_SCRIPT_HASH = "969a77db482f74ce27105f760efa139223431394";
-
 // Test setup
 static void setUp(void) {
     neoc_error_t err = neoc_init();
@@ -29,6 +27,24 @@ static void setUp(void) {
 // Test teardown
 static void tearDown(void) {
     neoc_cleanup();
+}
+
+static neoc_ec_public_key_t *create_public_key_from_hex(const char *hex) {
+    uint8_t buffer[NEOC_PUBLIC_KEY_SIZE_UNCOMPRESSED];
+    size_t decoded_len = 0;
+    neoc_error_t err = neoc_hex_decode(hex, buffer, sizeof(buffer), &decoded_len);
+    assert(err == NEOC_SUCCESS);
+
+    neoc_ec_public_key_t *key = NULL;
+    err = neoc_ec_public_key_from_bytes(buffer, decoded_len, &key);
+    assert(err == NEOC_SUCCESS);
+    return key;
+}
+
+static neoc_binary_writer_t *create_writer(void) {
+    neoc_binary_writer_t *writer = NULL;
+    assert(neoc_binary_writer_create(32, true, &writer) == NEOC_SUCCESS);
+    return writer;
 }
 
 // Test boolean condition decode
@@ -114,9 +130,8 @@ static void test_decode_and_condition(void) {
     assert(err == NEOC_SUCCESS);
     
     // Create group condition with public key
-    neoc_ec_public_key_t *pub_key = NULL;
-    err = neoc_ec_public_key_from_string("021821807f923a3da004fb73871509d7635bcc05f41edef2a3ca5c941d8bbc1231", &pub_key);
-    assert(err == NEOC_SUCCESS);
+    neoc_ec_public_key_t *pub_key =
+        create_public_key_from_hex("021821807f923a3da004fb73871509d7635bcc05f41edef2a3ca5c941d8bbc1231");
     
     neoc_witness_condition_t *cond2 = NULL;
     err = neoc_witness_condition_create_group(pub_key, &cond2);
@@ -157,12 +172,11 @@ static void test_decode_or_condition(void) {
     printf("Testing decode OR condition...\n");
     
     // Create group condition
-    neoc_ec_public_key_t *pub_key = NULL;
-    neoc_error_t err = neoc_ec_public_key_from_string("023be7b6742268f4faca4835718f3232ddc976855d5ef273524cea36f0e8d102f3", &pub_key);
-    assert(err == NEOC_SUCCESS);
+    neoc_ec_public_key_t *pub_key =
+        create_public_key_from_hex("023be7b6742268f4faca4835718f3232ddc976855d5ef273524cea36f0e8d102f3");
     
     neoc_witness_condition_t *cond1 = NULL;
-    err = neoc_witness_condition_create_group(pub_key, &cond1);
+    neoc_error_t err = neoc_witness_condition_create_group(pub_key, &cond1);
     assert(err == NEOC_SUCCESS);
     
     neoc_witness_condition_t *cond2 = NULL;
@@ -199,13 +213,13 @@ static void test_decode_script_hash(void) {
     printf("Testing decode script hash...\n");
     
     // Create script hash
-    neoc_hash160_t *hash = NULL;
+    neoc_hash160_t hash;
     neoc_error_t err = neoc_hash160_from_string("0xef4073a0f2b305a38ec4050e4d3d28bc40ea63f5", &hash);
     assert(err == NEOC_SUCCESS);
     
     // Create script hash condition
     neoc_witness_condition_t *condition = NULL;
-    err = neoc_witness_condition_create_script_hash(hash, &condition);
+    err = neoc_witness_condition_create_script_hash(&hash, &condition);
     assert(err == NEOC_SUCCESS);
     
     // Create witness rule
@@ -220,7 +234,7 @@ static void test_decode_script_hash(void) {
     // Cleanup
     neoc_witness_rule_free(rule);
     neoc_witness_condition_free(condition);
-    neoc_hash160_free(hash);
+    (void)hash;
     
     printf("  ✅ Decode script hash test passed\n");
 }
@@ -238,9 +252,7 @@ static void test_boolean_condition_serialize_deserialize(void) {
     uint8_t expected_bytes[] = { 0x00, 0x01 };
     
     // Serialize
-    neoc_binary_writer_t *writer = NULL;
-    err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
     
     err = neoc_witness_condition_serialize(condition, writer);
     assert(err == NEOC_SUCCESS);
@@ -298,9 +310,7 @@ static void test_not_condition_serialize_deserialize(void) {
     uint8_t expected_bytes[] = { 0x01, 0x00, 0x01 };
     
     // Serialize
-    neoc_binary_writer_t *writer = NULL;
-    err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
     
     err = neoc_witness_condition_serialize(condition, writer);
     assert(err == NEOC_SUCCESS);
@@ -340,9 +350,7 @@ static void test_called_by_entry_condition(void) {
     assert(type == NEOC_WITNESS_CONDITION_CALLED_BY_ENTRY);
     
     // Serialize
-    neoc_binary_writer_t *writer = NULL;
-    err = neoc_binary_writer_create(&writer);
-    assert(err == NEOC_SUCCESS);
+    neoc_binary_writer_t *writer = create_writer();
     
     err = neoc_witness_condition_serialize(condition, writer);
     assert(err == NEOC_SUCCESS);
@@ -370,13 +378,13 @@ static void test_called_by_contract_condition(void) {
     printf("Testing called by contract condition...\n");
     
     // Create hash
-    neoc_hash160_t *hash = NULL;
+    neoc_hash160_t hash;
     neoc_error_t err = neoc_hash160_from_string("0xef4073a0f2b305a38ec4050e4d3d28bc40ea63e4", &hash);
     assert(err == NEOC_SUCCESS);
     
     // Create called by contract condition
     neoc_witness_condition_t *condition = NULL;
-    err = neoc_witness_condition_create_called_by_contract(hash, &condition);
+    err = neoc_witness_condition_create_called_by_contract(&hash, &condition);
     assert(err == NEOC_SUCCESS);
     
     // Create witness rule
@@ -391,7 +399,7 @@ static void test_called_by_contract_condition(void) {
     // Cleanup
     neoc_witness_rule_free(rule);
     neoc_witness_condition_free(condition);
-    neoc_hash160_free(hash);
+    (void)hash;
     
     printf("  ✅ Called by contract condition test passed\n");
 }
@@ -401,13 +409,12 @@ static void test_called_by_group_condition(void) {
     printf("Testing called by group condition...\n");
     
     // Create public key
-    neoc_ec_public_key_t *pub_key = NULL;
-    neoc_error_t err = neoc_ec_public_key_from_string("035a1ced7ae274a881c3f479452c8bca774c89f653d54c5c5959a01371a8c696fd", &pub_key);
-    assert(err == NEOC_SUCCESS);
+    neoc_ec_public_key_t *pub_key =
+        create_public_key_from_hex("035a1ced7ae274a881c3f479452c8bca774c89f653d54c5c5959a01371a8c696fd");
     
     // Create called by group condition
     neoc_witness_condition_t *condition = NULL;
-    err = neoc_witness_condition_create_called_by_group(pub_key, &condition);
+    neoc_error_t err = neoc_witness_condition_create_called_by_group(pub_key, &condition);
     assert(err == NEOC_SUCCESS);
     
     // Create witness rule
