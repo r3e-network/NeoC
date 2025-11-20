@@ -66,6 +66,7 @@ neoc_error_t neoc_neo_plugin_create(const char *name,
     (*plugin)->version = dup_string(version);
     if (!(*plugin)->name || !(*plugin)->version) {
         neoc_neo_plugin_free(*plugin);
+        neoc_free(*plugin);
         *plugin = NULL;
         return NEOC_ERROR_OUT_OF_MEMORY;
     }
@@ -73,6 +74,7 @@ neoc_error_t neoc_neo_plugin_create(const char *name,
     neoc_error_t err = copy_interfaces(interfaces, interfaces_count, &(*plugin)->interfaces);
     if (err != NEOC_SUCCESS) {
         neoc_neo_plugin_free(*plugin);
+        neoc_free(*plugin);
         *plugin = NULL;
         return err;
     }
@@ -92,7 +94,6 @@ void neoc_neo_plugin_free(neoc_neo_plugin_t *plugin) {
         }
         neoc_free(plugin->interfaces);
     }
-    neoc_free(plugin);
 }
 
 neoc_error_t neoc_neo_list_plugins_create(int id,
@@ -314,6 +315,74 @@ neoc_error_t neoc_neo_list_plugins_from_json(const char *json_str,
     *response = parsed;
     neoc_json_free(json);
     return NEOC_SUCCESS;
+}
+
+neoc_neo_plugin_t *neoc_neo_list_plugins_get_plugins(const neoc_neo_list_plugins_t *response) {
+    return response ? response->result : NULL;
+}
+
+bool neoc_neo_list_plugins_has_plugins(const neoc_neo_list_plugins_t *response) {
+    return response && response->result && response->result_count > 0 && response->error == NULL;
+}
+
+size_t neoc_neo_list_plugins_get_count(const neoc_neo_list_plugins_t *response) {
+    return response ? response->result_count : 0;
+}
+
+neoc_neo_plugin_t *neoc_neo_list_plugins_get_plugin(const neoc_neo_list_plugins_t *response,
+                                                    size_t index) {
+    if (!response || !response->result || index >= response->result_count) {
+        return NULL;
+    }
+    return &response->result[index];
+}
+
+neoc_neo_plugin_t *neoc_neo_list_plugins_find_plugin(const neoc_neo_list_plugins_t *response,
+                                                     const char *name) {
+    if (!response || !response->result || !name) {
+        return NULL;
+    }
+    for (size_t i = 0; i < response->result_count; i++) {
+        const char *plugin_name = response->result[i].name ? response->result[i].name : "";
+        if (strcmp(plugin_name, name) == 0) {
+            return &response->result[i];
+        }
+    }
+    return NULL;
+}
+
+const char *neoc_neo_plugin_get_name(const neoc_neo_plugin_t *plugin) {
+    return plugin ? plugin->name : NULL;
+}
+
+const char *neoc_neo_plugin_get_version(const neoc_neo_plugin_t *plugin) {
+    return plugin ? plugin->version : NULL;
+}
+
+size_t neoc_neo_plugin_get_interfaces_count(const neoc_neo_plugin_t *plugin) {
+    return plugin ? plugin->interfaces_count : 0;
+}
+
+const char *neoc_neo_plugin_get_interface(const neoc_neo_plugin_t *plugin,
+                                          size_t index) {
+    if (!plugin || !plugin->interfaces || index >= plugin->interfaces_count) {
+        return NULL;
+    }
+    return plugin->interfaces[index];
+}
+
+bool neoc_neo_plugin_supports_interface(const neoc_neo_plugin_t *plugin,
+                                        const char *interface_name) {
+    if (!plugin || !interface_name || !plugin->interfaces) {
+        return false;
+    }
+    for (size_t i = 0; i < plugin->interfaces_count; i++) {
+        const char *iface = plugin->interfaces[i] ? plugin->interfaces[i] : "";
+        if (strcmp(iface, interface_name) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static neoc_error_t interfaces_to_json(const neoc_neo_plugin_t *plugin, neoc_json_t *obj) {

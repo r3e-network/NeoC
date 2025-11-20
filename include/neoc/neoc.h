@@ -10,7 +10,7 @@
  * - Wallet management
  * - Protocol communication
  * 
- * @version 1.0.0
+ * @version 1.1.0
  * @author NeoC SDK Team
  * @copyright 2024
  */
@@ -100,7 +100,7 @@ void neoc_cleanup(void);
 /**
  * @brief Get NeoC SDK version string
  * 
- * @return Version string (e.g., "1.0.0")
+ * @return Version string (e.g., "1.1.0")
  */
 const char* neoc_get_version(void);
 

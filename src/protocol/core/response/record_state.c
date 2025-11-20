@@ -192,6 +192,36 @@ neoc_error_t neoc_record_state_response_from_json(const char *json_str,
     return NEOC_SUCCESS;
 }
 
+neoc_error_t neoc_record_state_to_json(const neoc_record_state_t *state,
+                                       char **json_str) {
+    if (!state || !json_str) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+    *json_str = NULL;
+
+    const char *type_str = neoc_record_type_to_string(state->record_type);
+    if (!type_str) {
+        return NEOC_ERROR_INVALID_FORMAT;
+    }
+
+    neoc_json_t *root = neoc_json_create_object();
+    if (!root) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (state->name) {
+        neoc_json_add_string(root, "name", state->name);
+    }
+    if (state->data) {
+        neoc_json_add_string(root, "data", state->data);
+    }
+    neoc_json_add_string(root, "type", type_str);
+
+    *json_str = neoc_json_to_string(root);
+    neoc_json_free(root);
+    return *json_str ? NEOC_SUCCESS : NEOC_ERROR_OUT_OF_MEMORY;
+}
+
 neoc_error_t neoc_record_state_copy(const neoc_record_state_t *src,
                                     neoc_record_state_t **dest) {
     if (!src || !dest) {

@@ -593,7 +593,7 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    printf(COLOR_BOLD COLOR_CYAN "NeoC Security Audit Tool v1.0.0\n" COLOR_RESET);
+    printf(COLOR_BOLD COLOR_CYAN "NeoC Security Audit Tool v1.1.0\n" COLOR_RESET);
     printf("Starting security scan of: %s\n\n", g_config.target_path);
     
     // Check if target exists

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(NeoC VERSION 1.0.0 LANGUAGES C)
+project(NeoC VERSION 1.1.0 LANGUAGES C)
 
 # Set C standard
 set(CMAKE_C_STANDARD 11)
@@ -143,6 +143,7 @@ target_link_libraries(neoc
     ${OPENSSL_LIBRARIES}
     ${CJSON_LIBRARIES}
     ${CURL_LIBRARIES}
+    m
 )
 
 # Compiler definitions

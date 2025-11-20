@@ -22,7 +22,7 @@
 #include <neoc/crypto/hash.h>
 #include <neoc/types/uint256.h>
 
-#define PROFILE_VERSION "1.0.0"
+#define PROFILE_VERSION "1.1.0"
 #define MAX_SAMPLES 1000000
 #define DEFAULT_ITERATIONS 1000
 

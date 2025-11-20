@@ -222,3 +222,15 @@ neoc_neo_network_fee_t *neoc_neo_calculate_network_fee_get_fee(const neoc_neo_ca
 bool neoc_neo_calculate_network_fee_has_fee(const neoc_neo_calculate_network_fee_t *response) {
     return response && response->result && response->error == NULL && response->error_code == 0;
 }
+
+neoc_error_t neoc_neo_calculate_network_fee_get_fee_value(const neoc_neo_calculate_network_fee_t *response,
+                                                          int64_t *fee) {
+    if (!response || !fee) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+    if (!response->result) {
+        return NEOC_ERROR_INVALID_STATE;
+    }
+    *fee = response->result->network_fee;
+    return NEOC_SUCCESS;
+}

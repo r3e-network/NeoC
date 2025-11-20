@@ -9,12 +9,12 @@
 
 /* Version information */
 #define NEOC_VERSION_MAJOR 1
-#define NEOC_VERSION_MINOR 0
+#define NEOC_VERSION_MINOR 1
 #define NEOC_VERSION_PATCH 0
 
 /* Build information */
-static const char* version_string = "1.0.0";
-static const char* build_info = "NeoC SDK v1.0.0 - Built with OpenSSL";
+static const char* version_string = "1.1.0";
+static const char* build_info = "NeoC SDK v1.1.0 - Built with OpenSSL";
 
 /* Global state tracking */
 static int neoc_is_initialized = 0;

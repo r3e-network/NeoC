@@ -137,15 +137,12 @@ neoc_error_t neoc_populated_blocks_from_json(const char *json_str,
         for (size_t i = 0; i < count; i++) {
             neoc_json_t *entry = neoc_json_array_get(blocks_arr, i);
             int64_t val = 0;
-            neoc_json_get_int(entry ? entry : json, "", &val);
-            if (!entry || neoc_json_get_int(entry, "", &val) != NEOC_SUCCESS) {
-                /* Try "index" or direct number */
-                if (neoc_json_get_int(entry, "index", &val) != NEOC_SUCCESS) {
-                    /* fallback to treating as number */
-                    double dval = 0.0;
-                    if (neoc_json_get_number(entry ? entry : json, "", &dval) == NEOC_SUCCESS) {
-                        val = (int64_t)dval;
-                    }
+            if (neoc_json_get_int(entry ? entry : json, "value", &val) != NEOC_SUCCESS &&
+                neoc_json_get_int(entry ? entry : json, "", &val) != NEOC_SUCCESS &&
+                neoc_json_get_int(entry, "index", &val) != NEOC_SUCCESS) {
+                double dval = 0.0;
+                if (neoc_json_get_number(entry ? entry : json, "", &dval) == NEOC_SUCCESS) {
+                    val = (int64_t)dval;
                 }
             }
             blocks[i] = (int)val;
@@ -215,4 +212,57 @@ neoc_error_t neoc_populated_blocks_response_from_json(const char *json_str,
     *response = parsed;
     neoc_json_free(json);
     return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_populated_blocks_to_json(const neoc_populated_blocks_t *populated_blocks,
+                                           char **json_str) {
+    if (!populated_blocks || !json_str) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+    *json_str = NULL;
+
+    neoc_json_t *root = neoc_json_create_object();
+    if (!root) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (populated_blocks->cache_id) {
+        neoc_json_add_string(root, "cacheid", populated_blocks->cache_id);
+    }
+
+    if (populated_blocks->blocks && populated_blocks->blocks_count > 0) {
+        neoc_json_t *arr = neoc_json_create_array();
+        if (!arr) {
+            neoc_json_free(root);
+            return NEOC_ERROR_OUT_OF_MEMORY;
+        }
+        for (size_t i = 0; i < populated_blocks->blocks_count; i++) {
+            neoc_json_t *entry = neoc_json_create_object();
+            if (!entry) {
+                neoc_json_free(arr);
+                neoc_json_free(root);
+                return NEOC_ERROR_OUT_OF_MEMORY;
+            }
+            neoc_json_add_int(entry, "value", populated_blocks->blocks[i]);
+            neoc_json_array_add(arr, entry);
+        }
+        neoc_json_add_object(root, "blocks", arr);
+    }
+
+    *json_str = neoc_json_to_string(root);
+    neoc_json_free(root);
+    return *json_str ? NEOC_SUCCESS : NEOC_ERROR_OUT_OF_MEMORY;
+}
+
+bool neoc_populated_blocks_contains_block(const neoc_populated_blocks_t *populated_blocks,
+                                          int block_index) {
+    if (!populated_blocks || !populated_blocks->blocks) {
+        return false;
+    }
+    for (size_t i = 0; i < populated_blocks->blocks_count; i++) {
+        if (populated_blocks->blocks[i] == block_index) {
+            return true;
+        }
+    }
+    return false;
 }

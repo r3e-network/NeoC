@@ -17,6 +17,14 @@ static char *dup_string(const char *str) {
     return str ? neoc_strdup(str) : NULL;
 }
 
+static void clear_unspent_fields(neoc_unspent_transaction_t *unspent_tx) {
+    if (!unspent_tx) {
+        return;
+    }
+    neoc_free(unspent_tx->tx_id);
+    unspent_tx->tx_id = NULL;
+}
+
 static bool parse_double_string(const char *input, double *out) {
     if (!input || !out) {
         return false;
@@ -61,7 +69,7 @@ void neoc_unspent_transaction_free(neoc_unspent_transaction_t *unspent_tx) {
     if (!unspent_tx) {
         return;
     }
-    neoc_free(unspent_tx->tx_id);
+    clear_unspent_fields(unspent_tx);
     neoc_free(unspent_tx);
 }
 
@@ -89,7 +97,7 @@ static neoc_error_t clone_unspent_array(const neoc_unspent_transaction_t *src,
             dst[i].tx_id = dup_string(src[i].tx_id);
             if (!dst[i].tx_id) {
                 for (size_t j = 0; j <= i; j++) {
-                    neoc_unspent_transaction_free(&dst[j]);
+                    clear_unspent_fields(&dst[j]);
                 }
                 neoc_free(dst);
                 return NEOC_ERROR_OUT_OF_MEMORY;
@@ -138,21 +146,30 @@ neoc_error_t neoc_unspents_balance_create(const neoc_unspent_transaction_t *unsp
     return NEOC_SUCCESS;
 }
 
-void neoc_unspents_balance_free(neoc_unspents_balance_t *balance) {
+static void clear_balance_fields(neoc_unspents_balance_t *balance) {
     if (!balance) {
         return;
     }
 
     if (balance->unspent_transactions) {
         for (size_t i = 0; i < balance->unspent_transactions_count; i++) {
-            neoc_unspent_transaction_free(&balance->unspent_transactions[i]);
+            clear_unspent_fields(&balance->unspent_transactions[i]);
         }
         neoc_free(balance->unspent_transactions);
     }
     neoc_free(balance->asset_hash);
     neoc_free(balance->asset_name);
     neoc_free(balance->asset_symbol);
-    neoc_free(balance);
+    balance->asset_hash = NULL;
+    balance->asset_name = NULL;
+    balance->asset_symbol = NULL;
+}
+
+void neoc_unspents_balance_free(neoc_unspents_balance_t *balance) {
+    clear_balance_fields(balance);
+    if (balance) {
+        neoc_free(balance);
+    }
 }
 
 static neoc_error_t clone_balance_array(const neoc_unspents_balance_t *src,
@@ -175,31 +192,31 @@ static neoc_error_t clone_balance_array(const neoc_unspents_balance_t *src,
     for (size_t i = 0; i < count; i++) {
         dst[i].asset_hash = dup_string(src[i].asset_hash);
         dst[i].asset_name = dup_string(src[i].asset_name);
-        dst[i].asset_symbol = dup_string(src[i].asset_symbol);
-        dst[i].amount = src[i].amount;
+            dst[i].asset_symbol = dup_string(src[i].asset_symbol);
+            dst[i].amount = src[i].amount;
 
-        if ((src[i].asset_hash && !dst[i].asset_hash) ||
-            (src[i].asset_name && !dst[i].asset_name) ||
-            (src[i].asset_symbol && !dst[i].asset_symbol)) {
-            for (size_t j = 0; j <= i; j++) {
-                neoc_unspents_balance_free(&dst[j]);
-            }
-            neoc_free(dst);
-            return NEOC_ERROR_OUT_OF_MEMORY;
-        }
-
-        if (src[i].unspent_transactions && src[i].unspent_transactions_count > 0) {
-            neoc_error_t err = clone_unspent_array(src[i].unspent_transactions,
-                                                   src[i].unspent_transactions_count,
-                                                   &dst[i].unspent_transactions);
-            if (err != NEOC_SUCCESS) {
+            if ((src[i].asset_hash && !dst[i].asset_hash) ||
+                (src[i].asset_name && !dst[i].asset_name) ||
+                (src[i].asset_symbol && !dst[i].asset_symbol)) {
                 for (size_t j = 0; j <= i; j++) {
-                    neoc_unspents_balance_free(&dst[j]);
+                    clear_balance_fields(&dst[j]);
                 }
                 neoc_free(dst);
-                return err;
+                return NEOC_ERROR_OUT_OF_MEMORY;
             }
-            dst[i].unspent_transactions_count = src[i].unspent_transactions_count;
+
+            if (src[i].unspent_transactions && src[i].unspent_transactions_count > 0) {
+                neoc_error_t err = clone_unspent_array(src[i].unspent_transactions,
+                                                       src[i].unspent_transactions_count,
+                                                       &dst[i].unspent_transactions);
+                if (err != NEOC_SUCCESS) {
+                    for (size_t j = 0; j <= i; j++) {
+                        clear_balance_fields(&dst[j]);
+                    }
+                    neoc_free(dst);
+                    return err;
+                }
+                dst[i].unspent_transactions_count = src[i].unspent_transactions_count;
         }
     }
 
@@ -246,7 +263,7 @@ void neoc_unspents_free(neoc_unspents_t *unspents) {
     }
     if (unspents->balances) {
         for (size_t i = 0; i < unspents->balances_count; i++) {
-            neoc_unspents_balance_free(&unspents->balances[i]);
+            clear_balance_fields(&unspents->balances[i]);
         }
         neoc_free(unspents->balances);
     }
@@ -355,7 +372,7 @@ static neoc_error_t parse_unspent_transactions(neoc_json_t *array,
         items[i].tx_id = dup_string(txid);
         if (!items[i].tx_id) {
             for (size_t j = 0; j <= i; j++) {
-                neoc_unspent_transaction_free(&items[j]);
+                clear_unspent_fields(&items[j]);
             }
             neoc_free(items);
             return NEOC_ERROR_OUT_OF_MEMORY;
@@ -401,6 +418,9 @@ static neoc_error_t parse_balances(neoc_json_t *array,
 
         const char *asset_hash = neoc_json_get_string(entry, "asset_hash");
         if (!asset_hash) {
+            asset_hash = neoc_json_get_string(entry, "assethash");
+        }
+        if (!asset_hash) {
             asset_hash = neoc_json_get_string(entry, "asset");
         }
         const char *asset_name = neoc_json_get_string(entry, "assetname");
@@ -439,7 +459,7 @@ static neoc_error_t parse_balances(neoc_json_t *array,
 
         if (!balances[i].asset_hash || !balances[i].asset_symbol) {
             for (size_t j = 0; j <= i; j++) {
-                neoc_unspents_balance_free(&balances[j]);
+                clear_balance_fields(&balances[j]);
             }
             neoc_free(balances);
             return NEOC_ERROR_OUT_OF_MEMORY;
@@ -482,7 +502,7 @@ neoc_error_t neoc_unspents_from_json(const char *json_str,
     err = neoc_unspents_create(balances, balances_count, address ? address : "", unspents);
     if (balances) {
         for (size_t i = 0; i < balances_count; i++) {
-            neoc_unspents_balance_free(&balances[i]);
+            clear_balance_fields(&balances[i]);
         }
         neoc_free(balances);
     }

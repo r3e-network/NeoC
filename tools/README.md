@@ -370,6 +370,5 @@ Same as NeoC SDK - MIT License
 
 ## Version History
 
+- **v1.1.0** - Version bump aligned with NeoC SDK 1.1.0; refreshed tool banners/output
 - **v1.0.0** - Initial release with 6 core tools
-- **v1.1.0** - Added neoc-bench and neoc-test (planned)
-- **v1.2.0** - Enhanced monitoring capabilities (planned)

@@ -6,6 +6,7 @@
 #include <neoc/protocol/core/response/neo_get_unspents.h>
 #include <neoc/protocol/core/response/neo_list_plugins.h>
 #include <neoc/protocol/core/response/neo_network_fee.h>
+#include <neoc/protocol/core/response/neo_response_aliases.h>
 #include <neoc/protocol/core/response/neo_send_raw_transaction.h>
 #include <neoc/protocol/core/response/neo_witness.h>
 #include <neoc/protocol/core/response/nep17_contract.h>
@@ -125,7 +126,7 @@ void test_transaction_signer_roundtrip(void) {
 }
 
 void test_oracle_request_response_roundtrip(void) {
-    neoc_hash256_t tx_hash = make_hash256("0x11223344556677889900aabbccddeeff0011223344556677889900aabbccddeeff");
+    neoc_hash256_t tx_hash = make_hash256("0x11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff");
     neoc_hash160_t callback_contract = make_hash160("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 
     neoc_oracle_request_t *request = NULL;
@@ -227,7 +228,7 @@ void test_neo_list_plugins_roundtrip(void) {
     const char *interfaces[] = {"IWalletPlugin", "IRpcPlugin"};
     neoc_neo_plugin_t *plugin = NULL;
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
-                          neoc_neo_plugin_create("TestPlugin", "1.0.0", interfaces, 2, &plugin));
+                          neoc_neo_plugin_create("TestPlugin", "1.1.0", interfaces, 2, &plugin));
 
     neoc_neo_list_plugins_t *response = NULL;
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS,
@@ -420,7 +421,7 @@ void test_unspents_from_json(void) {
                           neoc_unspents_get_asset_balance(response->result,
                                                           "0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
                                                           &neo_balance));
-    TEST_ASSERT_EQUAL_DOUBLE(10.0, neo_balance);
+    TEST_ASSERT_TRUE(neo_balance == 10.0);
 
     neoc_neo_get_unspents_response_free(response);
 }

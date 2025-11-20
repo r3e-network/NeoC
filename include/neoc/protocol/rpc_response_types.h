@@ -29,7 +29,7 @@ extern "C" {
  * but are optimized for C usage with proper error handling and memory safety.
  * 
  * @author NeoC SDK Team
- * @version 1.0.0
+ * @version 1.1.0
  * @date 2024
  */
 

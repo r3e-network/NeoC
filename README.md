@@ -6,7 +6,7 @@ A comprehensive C library for Neo blockchain development providing core function
 
 - **GitHub**: https://github.com/r3e-network/NeoC
 - **Status**: Production Ready
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 
 ## Features
 
@@ -473,7 +473,7 @@ NeoC/
 
 ## License
 
-[Add appropriate license information]
+Licensed under the MIT License (see `LICENSE`).
 
 ## Support
 
@@ -481,13 +481,9 @@ For issues and questions:
 - Check the examples in `examples/`
 - Review test cases in `tests/`
 - Consult the API documentation in header files
+- See `CHANGELOG.md` for release notes
 - Report issues on GitHub: https://github.com/r3e-network/NeoC/issues
 
 ## Changelog
 
-### Version 1.0.0
-- Complete C implementation of NeoSwift SDK
-- All core functionality ported and tested
-- Duplicate file cleanup and naming standardization
-- Comprehensive test suite
-- Production-ready build system
+See `CHANGELOG.md` for detailed release notes.

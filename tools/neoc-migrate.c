@@ -699,7 +699,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    printf(COLOR_BOLD COLOR_CYAN "NeoC Migration Validator v1.0.0\n" COLOR_RESET);
+    printf(COLOR_BOLD COLOR_CYAN "NeoC Migration Validator v1.1.0\n" COLOR_RESET);
     printf("Analyzing migration from Swift to C...\n\n");
     
     // Check paths exist

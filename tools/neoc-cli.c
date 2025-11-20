@@ -20,7 +20,7 @@
 #include <neoc/crypto/keys.h>
 #include <neoc/types/uint256.h>
 
-#define VERSION "1.0.0"
+#define VERSION "1.1.0"
 #define DEFAULT_RPC_URL "http://localhost:10332"
 
 // Command structure

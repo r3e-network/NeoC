@@ -21,7 +21,7 @@
 #include <neoc/script/script.h>
 #include <neoc/types/uint256.h>
 
-#define DEBUG_VERSION "1.0.0"
+#define DEBUG_VERSION "1.1.0"
 #define MAX_BACKTRACE_SIZE 100
 #define LOG_BUFFER_SIZE 4096
 

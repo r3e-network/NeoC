@@ -639,3 +639,44 @@ bool neoc_transaction_signer_equals(const neoc_transaction_signer_t *signer1,
     }
     return true;
 }
+
+bool neoc_transaction_signer_has_scope(const neoc_transaction_signer_t *signer,
+                                       neoc_witness_scope_t scope) {
+    if (!signer || !signer->scopes) {
+        return false;
+    }
+    for (size_t i = 0; i < signer->scopes_count; i++) {
+        if (signer->scopes[i] == scope) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool neoc_transaction_signer_is_contract_allowed(const neoc_transaction_signer_t *signer,
+                                                 const char *contract_hash) {
+    if (!signer || !contract_hash || !signer->allowed_contracts) {
+        return false;
+    }
+    for (size_t i = 0; i < signer->allowed_contracts_count; i++) {
+        const char *allowed = signer->allowed_contracts[i] ? signer->allowed_contracts[i] : "";
+        if (strcmp(allowed, contract_hash) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool neoc_transaction_signer_is_group_allowed(const neoc_transaction_signer_t *signer,
+                                              const char *group_pubkey) {
+    if (!signer || !group_pubkey || !signer->allowed_groups) {
+        return false;
+    }
+    for (size_t i = 0; i < signer->allowed_groups_count; i++) {
+        const char *allowed = signer->allowed_groups[i] ? signer->allowed_groups[i] : "";
+        if (strcmp(allowed, group_pubkey) == 0) {
+            return true;
+        }
+    }
+    return false;
+}

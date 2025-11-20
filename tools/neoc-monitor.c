@@ -243,7 +243,7 @@ static void send_webhook_notification(const alert_t *alert) {
                 "{\"name\":\"Time\",\"value\":\"%s\",\"inline\":false},"
                 "{\"name\":\"Network\",\"value\":\"%s\",\"inline\":true}"
             "],"
-            "\"footer\":{\"text\":\"NeoC Monitor v1.0.0\"}"
+            "\"footer\":{\"text\":\"NeoC Monitor v1.1.0\"}"
         "}],"
         "\"attachments\":[{"
             "\"color\":\"%s\","
