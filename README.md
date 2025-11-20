@@ -38,6 +38,8 @@ A comprehensive C library for Neo blockchain development providing core function
 - **Smart Contracts**: NEP-17 (fungible tokens), NEP-11 (non-fungible tokens)
 - **Name Service**: Neo Name Service (NNS) integration
 - **RPC Client**: Full Neo node RPC client implementation
+- **RPC Coverage**: Includes calculate network fee, send raw transaction, token transfers/unspents, oracle requests, populated blocks, plugin listing, record state, transaction signer/send token, NEP-17 contract metadata, and Neo witness conversion.
+- **Response Aliases**: Convenience response helpers (block count/hash, connection count, boolean/string/transaction/address lists) restored for parity with NeoSwift.
 - **Protocol Support**: Neo protocol message handling
 
 ### Memory Management

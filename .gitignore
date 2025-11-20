@@ -6,6 +6,9 @@ install_manifest.txt
 Testing/
 NeoSwift/
 examples/Makefile
+NeoCConfig.cmake
+tests/Makefile
+/build_check/
 *.o
 *.a
 *.so

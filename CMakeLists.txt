@@ -105,7 +105,25 @@ set(NEOC_RESPONSE_SOURCES
     src/protocol/core/response/neo_get_nep11_transfers.c
     src/protocol/core/response/neo_get_next_block_validators.c
     src/protocol/core/response/neo_get_token_balances.c
+    src/protocol/core/response/neo_get_token_transfers.c
+    src/protocol/core/response/neo_get_unspents.c
     src/protocol/core/response/neo_get_claimable.c
+    src/protocol/core/response/neo_network_fee.c
+    src/protocol/core/response/neo_send_raw_transaction.c
+    src/protocol/core/response/neo_response_aliases.c
+    src/protocol/core/response/neo_list_plugins.c
+    src/protocol/core/response/nep17_contract.c
+    src/protocol/core/response/neo_witness.c
+    src/protocol/core/response/transaction_send_token.c
+    src/protocol/core/response/transaction_signer.c
+    src/protocol/core/response/populated_blocks.c
+    src/protocol/core/response/oracle_request.c
+    src/protocol/core/response/record_state.c
+    src/protocol/core/response/neo_get_state_root.c
+    src/protocol/core/response/neo_get_state_height.c
+    src/protocol/core/response/neo_get_unclaimed_gas.c
+    src/protocol/core/response/neo_get_wallet_balance.c
+    src/protocol/core/response/neo_validate_address.c
     src/protocol/core/response/neo_find_states.c
 )
 

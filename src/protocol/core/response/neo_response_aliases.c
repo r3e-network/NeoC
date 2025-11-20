@@ -1,75 +1,177 @@
 /**
  * @file neo_response_aliases.c
- * @brief neo_response_aliases implementation
- * 
- * Based on Swift source: protocol/core/response/NeoResponseAliases.swift
+ * @brief Implementation for common Neo RPC response aliases
  */
 
-#include "neoc/neoc.h"
-#include "neoc/neoc_memory.h"
-#include "neoc/neoc_error.h"
-#include <string.h>
+#include "neoc/protocol/core/response/neo_response_aliases.h"
+
+#include <stdbool.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <string.h>
 
-/**
- * @brief Create a new neo_response_aliases
- */
-neoc_neo_response_aliases_t *neoc_neo_response_aliases_create(void) {
-    neoc_neo_response_aliases_t *obj = (neoc_neo_response_aliases_t *)neoc_malloc(sizeof(neoc_neo_response_aliases_t));
-    if (!obj) {
-        return NULL;
-    }
-    
-    memset(obj, 0, sizeof(neoc_neo_response_aliases_t));
-    return obj;
-}
+typedef struct {
+    char *jsonrpc;
+    int id;
+    void *result;
+    char *error;
+    int error_code;
+} neoc_generic_response_t;
 
-/**
- * @brief Free a neo_response_aliases
- */
-void neoc_neo_response_aliases_free(neoc_neo_response_aliases_t *obj) {
-    if (!obj) {
+static void free_base_fields(neoc_generic_response_t *response) {
+    if (!response) {
         return;
     }
-    
-    // Free any allocated members here
-    neoc_free(obj);
+    if (response->jsonrpc) {
+        neoc_free(response->jsonrpc);
+    }
+    if (response->error) {
+        neoc_free(response->error);
+    }
+    if (response->result) {
+        neoc_free(response->result);
+    }
 }
 
-/**
- * @brief Serialize neo_response_aliases to JSON
- */
-char *neoc_neo_response_aliases_to_json(const neoc_neo_response_aliases_t *obj) {
-    if (!obj) {
-        return NULL;
+static neoc_error_t init_base_response(neoc_generic_response_t *response,
+                                       int id,
+                                       const char *error,
+                                       int error_code) {
+    if (!response) {
+        return NEOC_ERROR_INVALID_PARAM;
     }
-    
-    // Implement JSON serialization
-    char *json = neoc_malloc(512);
-    if (!json) {
-        return NULL;
+
+    response->jsonrpc = neoc_strdup("2.0");
+    if (!response->jsonrpc) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
     }
-    
-    snprintf(json, 512, "{\"type\":\"neo_response_aliases\"});
-    return json;
+
+    response->id = id;
+    response->error_code = error_code;
+
+    if (error) {
+        response->error = neoc_strdup(error);
+        if (!response->error) {
+            neoc_free(response->jsonrpc);
+            response->jsonrpc = NULL;
+            return NEOC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    return NEOC_SUCCESS;
 }
 
-/**
- * @brief Deserialize neo_response_aliases from JSON
- */
-neoc_neo_response_aliases_t *neoc_neo_response_aliases_from_json(const char *json) {
-    if (!json) {
-        return NULL;
+neoc_error_t neoc_neo_create_int_response(int id,
+                                          const int *result,
+                                          const char *error,
+                                          int error_code,
+                                          neoc_neo_block_count_t **response) {
+    if (!response) {
+        return NEOC_ERROR_INVALID_PARAM;
     }
-    
-    neoc_neo_response_aliases_t *obj = neoc_neo_response_aliases_create();
-    if (!obj) {
-        return NULL;
+
+    *response = NULL;
+    neoc_neo_block_count_t *created = neoc_calloc(1, sizeof(neoc_neo_block_count_t));
+    if (!created) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
     }
-    
-    // Implement JSON parsing
-    // This would typically use a JSON parser library
-    
-    return obj;
+
+    neoc_error_t err =
+        init_base_response((neoc_generic_response_t *)created, id, error, error_code);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(created);
+        return err;
+    }
+
+    if (result) {
+        created->result = neoc_malloc(sizeof(int));
+        if (!created->result) {
+            neoc_neo_response_free(created);
+            return NEOC_ERROR_OUT_OF_MEMORY;
+        }
+        *created->result = *result;
+    }
+
+    *response = created;
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_create_bool_response(int id,
+                                           const bool *result,
+                                           const char *error,
+                                           int error_code,
+                                           neoc_neo_boolean_response_t **response) {
+    if (!response) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+
+    *response = NULL;
+    neoc_neo_boolean_response_t *created =
+        neoc_calloc(1, sizeof(neoc_neo_boolean_response_t));
+    if (!created) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+
+    neoc_error_t err =
+        init_base_response((neoc_generic_response_t *)created, id, error, error_code);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(created);
+        return err;
+    }
+
+    if (result) {
+        created->result = neoc_malloc(sizeof(bool));
+        if (!created->result) {
+            neoc_neo_response_free(created);
+            return NEOC_ERROR_OUT_OF_MEMORY;
+        }
+        *created->result = *result;
+    }
+
+    *response = created;
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_neo_create_string_response(int id,
+                                             const char *result,
+                                             const char *error,
+                                             int error_code,
+                                             neoc_neo_string_response_t **response) {
+    if (!response) {
+        return NEOC_ERROR_INVALID_PARAM;
+    }
+
+    *response = NULL;
+    neoc_neo_string_response_t *created =
+        neoc_calloc(1, sizeof(neoc_neo_string_response_t));
+    if (!created) {
+        return NEOC_ERROR_OUT_OF_MEMORY;
+    }
+
+    neoc_error_t err =
+        init_base_response((neoc_generic_response_t *)created, id, error, error_code);
+    if (err != NEOC_SUCCESS) {
+        neoc_free(created);
+        return err;
+    }
+
+    if (result) {
+        created->result = neoc_strdup(result);
+        if (!created->result) {
+            neoc_neo_response_free(created);
+            return NEOC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    *response = created;
+    return NEOC_SUCCESS;
+}
+
+void neoc_neo_response_free(void *response) {
+    neoc_generic_response_t *generic = (neoc_generic_response_t *)response;
+    if (!generic) {
+        return;
+    }
+
+    free_base_fields(generic);
+    neoc_free(generic);
 }

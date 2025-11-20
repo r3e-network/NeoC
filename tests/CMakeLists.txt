@@ -185,6 +185,9 @@ target_link_libraries(test_neo_c_express unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL
 add_executable(test_neo_c_client test_neo_c_client.c)
 target_link_libraries(test_neo_c_client unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
 
+add_executable(test_new_rpc_responses test_new_rpc_responses.c)
+target_link_libraries(test_new_rpc_responses unity ${NEOC_LIBS} OpenSSL::SSL OpenSSL::Crypto)
+
 find_package(CURL REQUIRED)
 
 add_executable(test_integration test_integration.c)
@@ -470,6 +473,12 @@ add_test(NAME NeoCClientSendRequestTests COMMAND test_neo_c_client)
 set_tests_properties(NeoCClientSendRequestTests PROPERTIES
     TIMEOUT 60
     LABELS "protocol;client;unit"
+)
+
+add_test(NAME NewRpcResponsesTests COMMAND test_new_rpc_responses)
+set_tests_properties(NewRpcResponsesTests PROPERTIES
+    TIMEOUT 120
+    LABELS "protocol;rpc;unit"
 )
 
 # Type Conversion tests
