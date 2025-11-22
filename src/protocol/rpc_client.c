@@ -45,17 +45,6 @@ typedef struct {
     size_t capacity;
 } response_buffer_t;
 
-// Helper to duplicate string
-static char* str_dup(const char *str) {
-    if (!str) return NULL;
-    size_t len = strlen(str);
-    char *copy = neoc_malloc(len + 1);
-    if (copy) {
-        memcpy(copy, str, len + 1);
-    }
-    return copy;
-}
-
 #ifdef HAVE_CURL
 // CURL write callback
 static size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -91,7 +80,7 @@ neoc_error_t neoc_rpc_client_create(const char *url, neoc_rpc_client_t **client)
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate RPC client");
     }
     
-    (*client)->url = str_dup(url);
+    (*client)->url = neoc_strdup(url);
     if (!(*client)->url) {
         neoc_free(*client);
         *client = NULL;
@@ -151,12 +140,11 @@ static neoc_error_t make_rpc_call(neoc_rpc_client_t *client,
     
     if (params) {
         cJSON *params_json = cJSON_Parse(params);
-        if (params_json) {
-            cJSON_AddItemToObject(request, "params", params_json);
-        } else {
-            cJSON *params_array = cJSON_CreateArray();
-            cJSON_AddItemToObject(request, "params", params_array);
+        if (!params_json) {
+            cJSON_Delete(request);
+            return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid JSON parameters");
         }
+        cJSON_AddItemToObject(request, "params", params_json);
     } else {
         cJSON *params_array = cJSON_CreateArray();
         cJSON_AddItemToObject(request, "params", params_array);
@@ -222,9 +210,16 @@ static neoc_error_t make_rpc_call(neoc_rpc_client_t *client,
     // Get result
     cJSON *result_json = cJSON_GetObjectItem(response, "result");
     if (result_json) {
-        *result = cJSON_PrintUnformatted(result_json);
+        char *tmp = cJSON_PrintUnformatted(result_json);
+        if (!tmp) {
+            cJSON_Delete(response);
+            neoc_free(response_buf.data);
+            return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to serialize RPC result");
+        }
+        *result = neoc_strdup(tmp);
+        free(tmp);
     } else {
-        *result = str_dup("null");
+        *result = neoc_strdup("null");
     }
     
     cJSON_Delete(response);
@@ -260,9 +255,9 @@ neoc_error_t neoc_rpc_get_best_block_hash(neoc_rpc_client_t *client, neoc_hash25
     } else {
         err = neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid response format");
     }
-    free(result);
+    neoc_free(result);
 #else
-    free(result);
+    neoc_free(result);
     err = neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "cJSON support not compiled in");
 #endif
     
@@ -301,9 +296,9 @@ neoc_error_t neoc_rpc_get_block_hash(neoc_rpc_client_t *client,
     } else {
         err = neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid response format");
     }
-    free(result);
+    neoc_free(result);
 #else
-    free(result);
+    neoc_free(result);
     err = neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "cJSON support not compiled in");
 #endif
 
@@ -340,9 +335,9 @@ neoc_error_t neoc_rpc_get_block_count(neoc_rpc_client_t *client, uint32_t *count
     } else {
         err = neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid response format");
     }
-    free(result);
+    neoc_free(result);
 #else
-    free(result);
+    neoc_free(result);
     err = neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "cJSON support not compiled in");
 #endif
     
@@ -399,9 +394,9 @@ neoc_error_t neoc_rpc_send_raw_transaction(neoc_rpc_client_t *client,
     } else {
         err = neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid response format");
     }
-    free(result);
+    neoc_free(result);
 #else
-    free(result);
+    neoc_free(result);
     err = neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "cJSON support not compiled in");
 #endif
     
@@ -515,7 +510,7 @@ neoc_error_t neoc_rpc_get_nep17_balances(neoc_rpc_client_t *client,
                                 neoc_hash160_from_string(asset->valuestring, &(*balances)[i].asset_hash);
                             }
                             if (amount && cJSON_IsString(amount)) {
-                                (*balances)[i].amount = str_dup(amount->valuestring);
+                                (*balances)[i].amount = neoc_strdup(amount->valuestring);
                             }
                             if (updated && cJSON_IsNumber(updated)) {
                                 (*balances)[i].last_updated_block = updated->valueint;
@@ -534,9 +529,9 @@ neoc_error_t neoc_rpc_get_nep17_balances(neoc_rpc_client_t *client,
     } else {
         err = neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid response format");
     }
-    free(result);
+    neoc_free(result);
 #else
-    free(result);
+    neoc_free(result);
     *count = 0;
     *balances = NULL;
     err = neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "cJSON support not compiled in");
@@ -706,15 +701,15 @@ neoc_error_t neoc_rpc_get_block(neoc_rpc_client_t *client,
     // Parse the result
     cJSON *json = cJSON_Parse(result);
     if (!json) {
-        free(result);
+        neoc_free(result);
         return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid JSON response");
     }
     
     // Allocate block structure
-    *block = calloc(1, sizeof(neoc_block_t));
+    *block = neoc_calloc(1, sizeof(neoc_block_t));
     if (!*block) {
         cJSON_Delete(json);
-        free(result);
+        neoc_free(result);
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate block");
     }
     
@@ -789,7 +784,7 @@ neoc_error_t neoc_rpc_get_block(neoc_rpc_client_t *client,
     if (tx_array && cJSON_IsArray(tx_array)) {
         (*block)->tx_count = cJSON_GetArraySize(tx_array);
         if ((*block)->tx_count > 0) {
-            (*block)->tx_hashes = calloc((*block)->tx_count, sizeof(neoc_hash256_t));
+            (*block)->tx_hashes = neoc_calloc((*block)->tx_count, sizeof(neoc_hash256_t));
             if ((*block)->tx_hashes) {
                 for (size_t i = 0; i < (*block)->tx_count; i++) {
                     cJSON *tx_item = cJSON_GetArrayItem(tx_array, i);
@@ -817,7 +812,7 @@ neoc_error_t neoc_rpc_get_block(neoc_rpc_client_t *client,
     }
     
     cJSON_Delete(json);
-    free(result);
+    neoc_free(result);
     
     return NEOC_SUCCESS;
 #endif // HAVE_CJSON
@@ -866,15 +861,15 @@ neoc_error_t neoc_rpc_get_transaction(neoc_rpc_client_t *client,
     // Parse the result
     cJSON *json = cJSON_Parse(result);
     if (!json) {
-        free(result);
+        neoc_free(result);
         return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid JSON response");
     }
     
     // Allocate transaction structure
-    *transaction = calloc(1, sizeof(neoc_rpc_transaction_t));
+    *transaction = neoc_calloc(1, sizeof(neoc_rpc_transaction_t));
     if (!*transaction) {
         cJSON_Delete(json);
-        free(result);
+        neoc_free(result);
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate transaction");
     }
     
@@ -938,14 +933,14 @@ neoc_error_t neoc_rpc_get_transaction(neoc_rpc_client_t *client,
         const char *script_hex = item->valuestring;
         size_t hex_len = strlen(script_hex);
         (*transaction)->script_size = hex_len / 2;
-        (*transaction)->script = malloc((*transaction)->script_size);
+        (*transaction)->script = neoc_malloc((*transaction)->script_size);
         if ((*transaction)->script) {
             neoc_hex_decode(script_hex, (*transaction)->script, (*transaction)->script_size, NULL);
         }
     }
     
     cJSON_Delete(json);
-    free(result);
+    neoc_free(result);
     
     return NEOC_SUCCESS;
 #endif // HAVE_CJSON
@@ -992,15 +987,15 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
     // Parse the result
     cJSON *json = cJSON_Parse(result);
     if (!json) {
-        free(result);
+        neoc_free(result);
         return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Invalid JSON response");
     }
     
     // Allocate contract state structure
-    *state = calloc(1, sizeof(neoc_contract_state_t));
+    *state = neoc_calloc(1, sizeof(neoc_contract_state_t));
     if (!*state) {
         cJSON_Delete(json);
-        free(result);
+        neoc_free(result);
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate contract state");
     }
     
@@ -1084,7 +1079,7 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         if (groups_item && cJSON_IsArray(groups_item)) {
             (*state)->manifest.group_count = cJSON_GetArraySize(groups_item);
             if ((*state)->manifest.group_count > 0) {
-                (*state)->manifest.groups = calloc((*state)->manifest.group_count, sizeof(neoc_contract_group_t));
+                (*state)->manifest.groups = neoc_calloc((*state)->manifest.group_count, sizeof(neoc_contract_group_t));
                 // Parse group details if needed
             }
         }
@@ -1094,7 +1089,7 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         if (standards_item && cJSON_IsArray(standards_item)) {
             (*state)->manifest.supported_standards_count = cJSON_GetArraySize(standards_item);
             if ((*state)->manifest.supported_standards_count > 0) {
-                (*state)->manifest.supported_standards = calloc((*state)->manifest.supported_standards_count, sizeof(char*));
+                (*state)->manifest.supported_standards = neoc_calloc((*state)->manifest.supported_standards_count, sizeof(char*));
                 size_t i = 0;
                 cJSON *std_item = NULL;
                 cJSON_ArrayForEach(std_item, standards_item) {
@@ -1115,7 +1110,7 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
             if (methods_item && cJSON_IsArray(methods_item)) {
                 (*state)->manifest.abi.method_count = cJSON_GetArraySize(methods_item);
                 if ((*state)->manifest.abi.method_count > 0) {
-                    (*state)->manifest.abi.methods = calloc((*state)->manifest.abi.method_count, sizeof(neoc_contract_method_t));
+                    (*state)->manifest.abi.methods = neoc_calloc((*state)->manifest.abi.method_count, sizeof(neoc_contract_method_t));
                     // Parse method details if needed
                 }
             }
@@ -1125,7 +1120,7 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
             if (events_item && cJSON_IsArray(events_item)) {
                 (*state)->manifest.abi.event_count = cJSON_GetArraySize(events_item);
                 if ((*state)->manifest.abi.event_count > 0) {
-                    (*state)->manifest.abi.events = calloc((*state)->manifest.abi.event_count, sizeof(neoc_contract_event_t));
+                    (*state)->manifest.abi.events = neoc_calloc((*state)->manifest.abi.event_count, sizeof(neoc_contract_event_t));
                     // Parse event details if needed
                 }
             }
@@ -1136,7 +1131,7 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         if (permissions_item && cJSON_IsArray(permissions_item)) {
             (*state)->manifest.permission_count = cJSON_GetArraySize(permissions_item);
             if ((*state)->manifest.permission_count > 0) {
-                (*state)->manifest.permissions = calloc((*state)->manifest.permission_count, sizeof(neoc_contract_permission_t));
+                (*state)->manifest.permissions = neoc_calloc((*state)->manifest.permission_count, sizeof(neoc_contract_permission_t));
                 // Parse permission details if needed
             }
         }
@@ -1146,7 +1141,7 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         if (trusts_item && cJSON_IsArray(trusts_item)) {
             (*state)->manifest.trust_count = cJSON_GetArraySize(trusts_item);
             if ((*state)->manifest.trust_count > 0) {
-                (*state)->manifest.trusts = calloc((*state)->manifest.trust_count, sizeof(char*));
+                (*state)->manifest.trusts = neoc_calloc((*state)->manifest.trust_count, sizeof(char*));
                 // Parse trust details if needed
             }
         }
@@ -1156,13 +1151,14 @@ neoc_error_t neoc_rpc_get_contract_state(neoc_rpc_client_t *client,
         if (extra_item) {
             char *extra_str = cJSON_PrintUnformatted(extra_item);
             if (extra_str) {
-                (*state)->manifest.extra = extra_str;
+                (*state)->manifest.extra = neoc_strdup(extra_str);
+                free(extra_str);
             }
         }
     }
     
     cJSON_Delete(json);
-    free(result);
+    neoc_free(result);
     
     return NEOC_SUCCESS;
 #endif // HAVE_CJSON
@@ -1210,7 +1206,7 @@ neoc_error_t neoc_rpc_get_connection_count(neoc_rpc_client_t *client, uint32_t *
     *count = (uint32_t)atoi(result);
 #endif
     
-    free(result);
+    neoc_free(result);
     return err;
 }
 
@@ -1266,7 +1262,7 @@ neoc_error_t neoc_rpc_get_transaction_height(neoc_rpc_client_t *client,
     *height = (uint32_t)atoi(result);
 #endif
     
-    free(result);
+    neoc_free(result);
     return err;
 }
 
@@ -1296,7 +1292,7 @@ neoc_error_t neoc_rpc_get_state_height(neoc_rpc_client_t *client, uint32_t *heig
     *height = 0;
 #endif
     
-    free(result);
+    neoc_free(result);
     return err;
 }
 

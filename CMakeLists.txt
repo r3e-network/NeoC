@@ -65,7 +65,6 @@ endif()
 # Include directories
 include_directories(include)
 include_directories(third_party)
-include_directories(third_party/cjson)
 include_directories(${OPENSSL_INCLUDE_DIR})
 include_directories(${CJSON_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
@@ -73,7 +72,16 @@ include_directories(${CURL_INCLUDE_DIRS})
 # Source files
 file(GLOB_RECURSE SOURCES "src/*.c")
 list(APPEND SOURCES src/script/script_builder_full.c)
-list(APPEND SOURCES third_party/cjson/cJSON.c)
+
+set(USE_BUNDLED_CJSON OFF)
+if(NOT CJSON_FOUND OR NOT CJSON_LIBRARIES)
+    set(USE_BUNDLED_CJSON ON)
+endif()
+
+if(USE_BUNDLED_CJSON)
+    include_directories(third_party/cjson)
+    list(APPEND SOURCES third_party/cjson/cJSON.c)
+endif()
 
 # Remove incomplete RPC response stubs until they are fully implemented
 list(FILTER SOURCES EXCLUDE REGEX "/src/protocol/core/response/neo_get_.*\\.c$")

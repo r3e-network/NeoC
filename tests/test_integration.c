@@ -124,7 +124,7 @@ void test_transaction_building_workflow(void) {
     TEST_ASSERT_EQUAL_INT(NEOC_SUCCESS, err);
     
     // Clean up
-    free(script_bytes);
+    neoc_free(script_bytes);
     neoc_script_builder_free(script);
     neoc_transaction_free(tx);
     neoc_tx_builder_free(builder);
@@ -169,7 +169,7 @@ void test_script_building_workflow(void) {
     TEST_ASSERT_TRUE(script_len > 0);
     
     // Clean up
-    free(script_bytes);
+    neoc_free(script_bytes);
     neoc_script_builder_free(builder);
 }
 

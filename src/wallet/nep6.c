@@ -29,17 +29,6 @@ struct neoc_nep6_wallet_t {
     void *extra;  // Extra data
 };
 
-// Helper to duplicate string
-static char* str_dup(const char *str) {
-    if (!str) return NULL;
-    size_t len = strlen(str);
-    char *copy = neoc_malloc(len + 1);
-    if (copy) {
-        memcpy(copy, str, len + 1);
-    }
-    return copy;
-}
-
 neoc_error_t neoc_nep6_wallet_create(const char *name,
                                       const char *version,
                                       neoc_nep6_wallet_t **wallet) {
@@ -52,8 +41,8 @@ neoc_error_t neoc_nep6_wallet_create(const char *name,
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate wallet");
     }
     
-    (*wallet)->name = str_dup(name ? name : "NeoC Wallet");
-    (*wallet)->version = str_dup(version ? version : "1.0");
+    (*wallet)->name = neoc_strdup(name ? name : "NeoC Wallet");
+    (*wallet)->version = neoc_strdup(version ? version : "1.0");
     
     // Set default scrypt parameters
     (*wallet)->scrypt.n = 16384;

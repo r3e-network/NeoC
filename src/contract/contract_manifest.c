@@ -59,17 +59,6 @@ struct neoc_contract_manifest_t {
     char *extra;
 };
 
-// Helper to duplicate string
-static char* str_dup(const char *str) {
-    if (!str) return NULL;
-    size_t len = strlen(str);
-    char *copy = neoc_malloc(len + 1);
-    if (copy) {
-        memcpy(copy, str, len + 1);
-    }
-    return copy;
-}
-
 neoc_error_t neoc_contract_manifest_create(neoc_contract_manifest_t **manifest) {
     if (!manifest) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid manifest pointer");
@@ -83,7 +72,7 @@ neoc_error_t neoc_contract_manifest_create(neoc_contract_manifest_t **manifest) 
     neoc_contract_manifest_t* m = *manifest;
     
     // Set default name
-    m->name = str_dup("Contract");
+    m->name = neoc_strdup("Contract");
     if (!m->name) {
         neoc_free(*manifest);
         *manifest = NULL;
@@ -144,7 +133,7 @@ neoc_error_t neoc_contract_manifest_set_standards(neoc_contract_manifest_t *mani
     
     // Copy standards
     for (size_t i = 0; i < count; i++) {
-        manifest->supported_standards[i] = str_dup(standards[i]);
+        manifest->supported_standards[i] = neoc_strdup(standards[i]);
         if (!manifest->supported_standards[i]) {
             // Clean up on error
             for (size_t j = 0; j < i; j++) {
@@ -181,7 +170,7 @@ neoc_error_t neoc_contract_manifest_add_method(neoc_contract_manifest_t *manifes
     
     neoc_contract_method_t *method = &manifest->abi.methods[manifest->abi.method_count];
     
-    method->name = str_dup(name);
+    method->name = neoc_strdup(name);
     if (!method->name) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to copy name");
     }
@@ -227,7 +216,7 @@ neoc_error_t neoc_contract_manifest_add_event(neoc_contract_manifest_t *manifest
     
     neoc_contract_event_t *event = &manifest->abi.events[manifest->abi.event_count];
     
-    event->name = str_dup(name);
+    event->name = neoc_strdup(name);
     if (!event->name) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to copy name");
     }
@@ -271,7 +260,7 @@ neoc_error_t neoc_contract_manifest_add_permission(neoc_contract_manifest_t *man
     
     // Copy contract string if provided
     if (contract) {
-        perm->contract = str_dup(contract);
+        perm->contract = neoc_strdup(contract);
         if (!perm->contract) {
             return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate contract string");
         }
@@ -289,7 +278,7 @@ neoc_error_t neoc_contract_manifest_add_permission(neoc_contract_manifest_t *man
         }
         
         for (size_t i = 0; i < method_count; i++) {
-            perm->methods[i] = str_dup(methods[i]);
+            perm->methods[i] = neoc_strdup(methods[i]);
             if (!perm->methods[i]) {
                 // Clean up on error
                 for (size_t j = 0; j < i; j++) {
@@ -356,7 +345,7 @@ neoc_error_t neoc_contract_manifest_set_features(neoc_contract_manifest_t *manif
         
         // Store in manifest's extra field
         if (!manifest->extra) {
-            manifest->extra = str_dup(feature_json);
+            manifest->extra = neoc_strdup(feature_json);
         } else {
             // Merge with existing extra data
             size_t extra_len = strlen(manifest->extra) + strlen(feature_json) + 10;
@@ -379,7 +368,7 @@ neoc_error_t neoc_contract_manifest_set_extra(neoc_contract_manifest_t *manifest
     }
     
     neoc_free(manifest->extra);
-    manifest->extra = extra ? str_dup(extra) : NULL;
+    manifest->extra = extra ? neoc_strdup(extra) : NULL;
     
     return NEOC_SUCCESS;
 }
@@ -618,7 +607,7 @@ neoc_error_t neoc_contract_manifest_from_json(const char *json,
     cJSON *name = cJSON_GetObjectItem(root, "name");
     if (name && cJSON_IsString(name)) {
         neoc_free((*manifest)->name);
-        (*manifest)->name = str_dup(name->valuestring);
+        (*manifest)->name = neoc_strdup(name->valuestring);
     }
     
     // Parse supported standards

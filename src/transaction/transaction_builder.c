@@ -11,9 +11,14 @@
 #include "neoc/serialization/binary_writer.h"
 #include "neoc/protocol/rpc_client.h"
 #include "neoc/types/neoc_hash160.h"
+#include <openssl/rand.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#ifdef HAVE_CJSON
+#include <cjson/cJSON.h>
+#endif
 
 // Transaction builder structure
 struct neoc_tx_builder_t {
@@ -34,14 +39,57 @@ struct neoc_tx_builder_t {
     neoc_transaction_t *built_transaction;
 };
 
-// Initialize random seed once
-static void init_random(void) {
-    static bool initialized = false;
-    if (!initialized) {
-        srand((unsigned int)time(NULL));
-        initialized = true;
+static uint32_t generate_nonce(void) {
+    uint32_t nonce = 0;
+    if (RAND_bytes((unsigned char *)&nonce, sizeof(nonce)) == 1) {
+        return nonce;
     }
+    srand((unsigned int)(time(NULL) ^ (uintptr_t)&nonce));
+    return (uint32_t)rand();
 }
+
+#ifdef HAVE_CJSON
+static neoc_error_t push_json_value(neoc_script_builder_t *builder, const cJSON *item) {
+    if (!builder || !item) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid parameter value");
+    }
+
+    if (cJSON_IsBool(item)) {
+        return neoc_script_builder_push_bool(builder, cJSON_IsTrue(item));
+    } else if (cJSON_IsNull(item)) {
+        return neoc_script_builder_emit(builder, NEOC_OP_PUSHNULL);
+    } else if (cJSON_IsNumber(item)) {
+        int64_t as_int = (int64_t)item->valuedouble;
+        double diff = item->valuedouble - (double)as_int;
+        if (diff < 0) diff = -diff;
+        if (diff > 1e-9) {
+            return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Non-integer numeric parameter not supported");
+        }
+        return neoc_script_builder_push_integer(builder, as_int);
+    } else if (cJSON_IsString(item)) {
+        const char *str = item->valuestring ? item->valuestring : "";
+        return neoc_script_builder_push_string(builder, str);
+    } else if (cJSON_IsArray(item)) {
+        size_t count = (size_t)cJSON_GetArraySize(item);
+        for (size_t i = count; i-- > 0;) {
+            neoc_error_t err = push_json_value(builder, cJSON_GetArrayItem(item, (int)i));
+            if (err != NEOC_SUCCESS) {
+                return err;
+            }
+        }
+        if (count > 0) {
+            neoc_error_t err = neoc_script_builder_push_integer(builder, (int64_t)count);
+            if (err != NEOC_SUCCESS) {
+                return err;
+            }
+            return neoc_script_builder_emit(builder, NEOC_OP_PACK);
+        }
+        return neoc_script_builder_emit(builder, NEOC_OP_NEWARRAY0);
+    }
+
+    return neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Unsupported parameter type");
+}
+#endif
 
 neoc_error_t neoc_tx_builder_create(neoc_tx_builder_t **builder) {
     if (!builder) {
@@ -53,12 +101,10 @@ neoc_error_t neoc_tx_builder_create(neoc_tx_builder_t **builder) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate transaction builder");
     }
     
-    init_random();
-    
     // Set defaults
     (*builder)->version = 0;  // Current transaction version
-    (*builder)->nonce = (uint32_t)rand();
-    (*builder)->valid_until_block = 0;  // Will be set later
+    (*builder)->nonce = generate_nonce();
+    (*builder)->valid_until_block = TX_DEFAULT_VALID_UNTIL_BLOCK;
     (*builder)->system_fee = 0;
     (*builder)->network_fee = TX_DEFAULT_NETWORK_FEE;
     
@@ -100,6 +146,10 @@ neoc_error_t neoc_tx_builder_set_valid_until_block(neoc_tx_builder_t *builder,
     if (!builder) {
         return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid builder");
     }
+
+    if (block_height == 0) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Valid until block must be greater than zero");
+    }
     
     builder->valid_until_block = block_height;
     return NEOC_SUCCESS;
@@ -108,6 +158,35 @@ neoc_error_t neoc_tx_builder_set_valid_until_block(neoc_tx_builder_t *builder,
 neoc_error_t neoc_transaction_builder_set_valid_until_block(neoc_transaction_builder_t *builder,
                                                             uint32_t block_height) {
     return neoc_tx_builder_set_valid_until_block(builder, block_height);
+}
+
+neoc_error_t neoc_tx_builder_set_valid_until_block_from_rpc(neoc_tx_builder_t *builder,
+                                                            neoc_rpc_client_t *client,
+                                                            uint32_t increment) {
+    if (!builder || !client) {
+        return neoc_error_set(NEOC_ERROR_INVALID_ARGUMENT, "Invalid builder or client");
+    }
+
+    uint32_t height = 0;
+    neoc_error_t err = neoc_rpc_get_block_count(client, &height);
+    if (err != NEOC_SUCCESS) {
+        return err;
+    }
+
+    uint64_t inc = increment == 0 ? 1000 : increment;
+    uint64_t target = (uint64_t)height + inc;
+    if (target > UINT32_MAX) {
+        return neoc_error_set(NEOC_ERROR_INVALID_SIZE, "validUntilBlock exceeds uint32 range");
+    }
+
+    builder->valid_until_block = (uint32_t)target;
+    return NEOC_SUCCESS;
+}
+
+neoc_error_t neoc_transaction_builder_set_valid_until_block_from_rpc(neoc_transaction_builder_t *builder,
+                                                                     neoc_rpc_client_t *client,
+                                                                     uint32_t increment) {
+    return neoc_tx_builder_set_valid_until_block_from_rpc(builder, client, increment);
 }
 
 neoc_error_t neoc_tx_builder_set_script(neoc_tx_builder_t *builder,
@@ -363,6 +442,8 @@ neoc_error_t neoc_tx_builder_calculate_fees(neoc_tx_builder_t *builder,
     // Network fee = base fee + size fee + signature verification fee
     // System fee = gas consumed by script execution
     
+    size_t signer_count = builder->signer_count;
+
     // Build unsigned transaction first to get size
     neoc_transaction_t *temp_tx = NULL;
     neoc_error_t err = neoc_tx_builder_build_unsigned(builder, &temp_tx);
@@ -389,7 +470,7 @@ neoc_error_t neoc_tx_builder_calculate_fees(neoc_tx_builder_t *builder,
         }
 
         uint64_t size_fee = serialized_size * 1000;
-        uint64_t sig_fee = builder->signer_count * 1000000;
+        uint64_t sig_fee = signer_count * 1000000;
 
         *network_fee = size_fee + sig_fee;
 
@@ -432,6 +513,10 @@ neoc_error_t neoc_tx_builder_build_unsigned(neoc_tx_builder_t *builder,
     
     if (!builder->script || builder->script_size == 0) {
         return neoc_error_set(NEOC_ERROR_INVALID_STATE, "No script set");
+    }
+
+    if (builder->valid_until_block == 0) {
+        return neoc_error_set(NEOC_ERROR_INVALID_STATE, "Valid until block not set");
     }
     
     if (builder->signer_count == 0) {
@@ -639,6 +724,9 @@ neoc_error_t neoc_tx_builder_create_nep17_transfer(const neoc_hash160_t *token_h
     
     err = neoc_script_builder_push_integer(sb, 4);  // Parameter count
     if (err != NEOC_SUCCESS) goto cleanup;
+
+    err = neoc_script_builder_emit(sb, NEOC_OP_PACK);
+    if (err != NEOC_SUCCESS) goto cleanup;
     
     err = neoc_script_builder_push_string(sb, "transfer");
     if (err != NEOC_SUCCESS) goto cleanup;
@@ -704,68 +792,46 @@ neoc_error_t neoc_tx_builder_create_contract_call(const neoc_hash160_t *contract
     }
     
     // Parse params JSON and push parameters to stack
+#ifdef HAVE_CJSON
     if (params && strlen(params) > 0) {
-        // Simple JSON array parsing for parameters
-        // Format: [value1, value2, ...] or [{type:"Integer",value:"123"}, ...]
-        const char *p = params;
-        
-        // Skip whitespace and find array start
-        while (*p && (*p == ' ' || *p == '\t' || *p == '\n')) p++;
-        
-        if (*p == '[') {
-            p++; // Skip '['
-            
-            // Count parameters first
-            int param_count = 0;
-            const char *temp = p;
-            int depth = 1;
-            bool in_string = false;
-            
-            while (*temp && depth > 0) {
-                if (!in_string) {
-                    if (*temp == '[' || *temp == '{') depth++;
-                    else if (*temp == ']' || *temp == '}') depth--;
-                    else if (*temp == ',' && depth == 1) param_count++;
-                    else if (*temp == '"') in_string = true;
-                } else {
-                    if (*temp == '"' && *(temp-1) != '\\') in_string = false;
-                }
-                temp++;
+        cJSON *param_array = cJSON_Parse(params);
+        if (!param_array || !cJSON_IsArray(param_array)) {
+            if (param_array) cJSON_Delete(param_array);
+            err = neoc_error_set(NEOC_ERROR_INVALID_FORMAT, "Contract parameters must be a JSON array");
+            goto cleanup;
+        }
+
+        size_t param_count = (size_t)cJSON_GetArraySize(param_array);
+        for (size_t i = param_count; i-- > 0;) {
+            err = push_json_value(sb, cJSON_GetArrayItem(param_array, (int)i));
+            if (err != NEOC_SUCCESS) {
+                cJSON_Delete(param_array);
+                goto cleanup;
             }
-            
-            if (param_count > 0 || (p != temp - 1)) {
-                param_count++; // Add one for the last parameter
-            }
-            
-            // Parse and push each parameter based on its type
-            // Parameters should be pushed in order, then packed into array
-            // Full implementation parses JSON-like parameter syntax:
-            // - Numbers: 123, -456, 0.789
-            // - Strings: "hello", "world"
-            // - Booleans: true, false
-            // - Hex bytes: 0x1234abcd
-            // - Addresses: NXV...xyz
-            
-            // For complex parameter parsing, create array with PACK opcode
-            if (param_count > 0) {
-                err = neoc_script_builder_push_integer(sb, param_count);
-                if (err != NEOC_SUCCESS) goto cleanup;
+        }
+
+        if (param_count > 0) {
+            err = neoc_script_builder_push_integer(sb, (int64_t)param_count);
+            if (err == NEOC_SUCCESS) {
                 err = neoc_script_builder_emit(sb, NEOC_OP_PACK);
-                if (err != NEOC_SUCCESS) goto cleanup;
-            } else {
-                err = neoc_script_builder_emit(sb, NEOC_OP_NEWARRAY0);
-                if (err != NEOC_SUCCESS) goto cleanup;
             }
         } else {
-            // No parameters provided
             err = neoc_script_builder_emit(sb, NEOC_OP_NEWARRAY0);
-            if (err != NEOC_SUCCESS) goto cleanup;
         }
+        cJSON_Delete(param_array);
+        if (err != NEOC_SUCCESS) goto cleanup;
     } else {
-        // No parameters
-        err = neoc_script_builder_push_integer(sb, 0);
+        err = neoc_script_builder_emit(sb, NEOC_OP_NEWARRAY0);
         if (err != NEOC_SUCCESS) goto cleanup;
     }
+#else
+    if (params && strlen(params) > 0) {
+        err = neoc_error_set(NEOC_ERROR_NOT_IMPLEMENTED, "Contract parameter parsing requires cJSON");
+        goto cleanup;
+    }
+    err = neoc_script_builder_emit(sb, NEOC_OP_NEWARRAY0);
+    if (err != NEOC_SUCCESS) goto cleanup;
+#endif
     
     err = neoc_script_builder_push_string(sb, method);
     if (err != NEOC_SUCCESS) goto cleanup;

@@ -38,7 +38,7 @@ static integration_test_result_t test_basic_transaction_creation(void *context) 
     err = neoc_transaction_builder_set_nonce(builder, (uint32_t)time(NULL));
     INTEGRATION_ASSERT_SUCCESS(err);
     
-    err = neoc_transaction_builder_set_valid_until_block(builder, 1000000);
+    err = neoc_transaction_builder_set_valid_until_block(builder, TX_DEFAULT_VALID_UNTIL_BLOCK);
     INTEGRATION_ASSERT_SUCCESS(err);
     
     err = neoc_transaction_builder_set_system_fee(builder, 100000000); // 1 GAS
@@ -150,7 +150,7 @@ static integration_test_result_t test_multisig_transaction(void *context) {
     err = neoc_transaction_builder_set_nonce(builder, 12345);
     INTEGRATION_ASSERT_SUCCESS(err);
     
-    err = neoc_transaction_builder_set_valid_until_block(builder, 2000000);
+    err = neoc_transaction_builder_set_valid_until_block(builder, TX_DEFAULT_VALID_UNTIL_BLOCK + 1000);
     INTEGRATION_ASSERT_SUCCESS(err);
     
     // Add a script
@@ -358,7 +358,7 @@ static integration_test_result_t test_complex_transaction(void *context) {
     err = neoc_transaction_builder_set_nonce(builder, 999999);
     INTEGRATION_ASSERT_SUCCESS(err);
     
-    err = neoc_transaction_builder_set_valid_until_block(builder, 5000000);
+    err = neoc_transaction_builder_set_valid_until_block(builder, TX_DEFAULT_VALID_UNTIL_BLOCK + 4000);
     INTEGRATION_ASSERT_SUCCESS(err);
     
     err = neoc_transaction_builder_set_system_fee(builder, 500000000); // 5 GAS

@@ -14,7 +14,7 @@
 #include <neoc/contract/gas_token.h>
 #include <neoc/script/script_builder.h>
 #include <neoc/types/uint256.h>
-#include <neoc/rpc/rpc_client.h>
+#include <neoc/protocol/rpc_client.h>
 
 /**
  * Example 1: Build a simple transfer transaction
@@ -115,8 +115,14 @@ int example_simple_transfer() {
     printf("  To: %s\n", neoc_account_get_address(receiver));
     printf("  Amount: %lld NEO\n\n", (long long)amount);
     
-    // Set transaction attributes
-    err = neoc_transaction_builder_set_valid_until_block(builder, 1000000);
+    // Set transaction attributes (derive expiry from RPC if available)
+    neoc_rpc_client_t *rpc = NULL;
+    if (neoc_rpc_client_create("http://localhost:10332", &rpc) == NEOC_SUCCESS) {
+        err = neoc_transaction_builder_set_valid_until_block_from_rpc(builder, rpc, 1000);
+        neoc_rpc_client_free(rpc);
+    } else {
+        err = neoc_transaction_builder_set_valid_until_block(builder, TX_DEFAULT_VALID_UNTIL_BLOCK);
+    }
     err |= neoc_transaction_builder_set_system_fee(builder, 1000000); // 0.01 GAS
     err |= neoc_transaction_builder_set_network_fee(builder, 1000000); // 0.01 GAS
     

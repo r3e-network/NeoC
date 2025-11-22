@@ -201,9 +201,18 @@ neoc_error_t neoc_script_create_contract_call(const neoc_hash160_t *contract_has
             }
         }
     }
-    
-    // Push parameter count
-    err = neoc_script_builder_push_integer(builder, (int64_t)param_count);
+
+    // Build parameter array
+    if (param_count > 0) {
+        err = neoc_script_builder_push_integer(builder, (int64_t)param_count);
+        if (err != NEOC_SUCCESS) {
+            neoc_script_builder_free(builder);
+            return err;
+        }
+        err = neoc_script_builder_emit(builder, NEOC_OP_PACK);
+    } else {
+        err = neoc_script_builder_emit(builder, NEOC_OP_NEWARRAY0);
+    }
     if (err != NEOC_SUCCESS) {
         neoc_script_builder_free(builder);
         return err;
@@ -287,8 +296,14 @@ neoc_error_t neoc_script_create_nep17_transfer(const neoc_hash160_t *token_hash,
         return err;
     }
     
-    // Push parameter count (4)
+    // Push parameter count (4) and pack into array
     err = neoc_script_builder_push_integer(builder, 4);
+    if (err != NEOC_SUCCESS) {
+        neoc_script_builder_free(builder);
+        return err;
+    }
+    
+    err = neoc_script_builder_emit(builder, NEOC_OP_PACK);
     if (err != NEOC_SUCCESS) {
         neoc_script_builder_free(builder);
         return err;

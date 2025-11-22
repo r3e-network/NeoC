@@ -34,6 +34,7 @@ typedef struct neoc_rpc_client_t neoc_rpc_client_t;
 #define TX_BUILDER_MAX_SIGNERS 16
 #define TX_BUILDER_MAX_ATTRIBUTES 16
 #define TX_BUILDER_MAX_WITNESSES 16
+#define TX_DEFAULT_VALID_UNTIL_BLOCK 1000000
 
 // Fee constants (in GAS fractions)
 #define TX_DEFAULT_NETWORK_FEE 100000      // 0.001 GAS
@@ -75,13 +76,28 @@ neoc_error_t neoc_transaction_builder_set_nonce(neoc_transaction_builder_t *buil
  * @brief Set the valid until block
  * 
  * @param builder Transaction builder
- * @param block_height Block height until which transaction is valid
+ * @param block_height Block height until which transaction is valid (must be > 0)
  * @return NEOC_SUCCESS on success, error code otherwise
  */
 neoc_error_t neoc_tx_builder_set_valid_until_block(neoc_tx_builder_t *builder, 
                                                      uint32_t block_height);
 neoc_error_t neoc_transaction_builder_set_valid_until_block(neoc_transaction_builder_t *builder,
                                                             uint32_t block_height);
+
+/**
+ * @brief Set valid until block using current chain height from RPC
+ *
+ * @param builder Transaction builder
+ * @param client RPC client to query current block height
+ * @param increment Blocks to add to current height (default 1000 if 0)
+ * @return NEOC_SUCCESS on success, error code otherwise
+ */
+neoc_error_t neoc_tx_builder_set_valid_until_block_from_rpc(neoc_tx_builder_t *builder,
+                                                            neoc_rpc_client_t *client,
+                                                            uint32_t increment);
+neoc_error_t neoc_transaction_builder_set_valid_until_block_from_rpc(neoc_transaction_builder_t *builder,
+                                                                     neoc_rpc_client_t *client,
+                                                                     uint32_t increment);
 
 /**
  * @brief Set the transaction script

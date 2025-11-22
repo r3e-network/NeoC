@@ -4,6 +4,7 @@
 #include "neoc/crypto/neoc_hash.h"
 #include "neoc/utils/neoc_base58.h"
 #include "neoc/script/script_builder.h"
+#include "neoc/neoc_memory.h"
 #include <openssl/ec.h>
 #include <openssl/ecdsa.h>
 #include <openssl/evp.h>
@@ -218,11 +219,12 @@ neoc_error_t neoc_ec_key_pair_get_address(const neoc_ec_key_pair_t *key_pair, ch
         return err;
     }
     
-    *address = malloc(strlen(temp_address) + 1);
+    size_t addr_len = strlen(temp_address) + 1;
+    *address = neoc_malloc(addr_len);
     if (!*address) {
         return neoc_error_set(NEOC_ERROR_MEMORY, "Failed to allocate address");
     }
-    strcpy(*address, temp_address);
+    memcpy(*address, temp_address, addr_len);
     
     return NEOC_SUCCESS;
 }
