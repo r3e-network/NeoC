@@ -216,6 +216,13 @@ if (account) {
 // Create transaction builder
 neoc_transaction_builder_t* builder = neoc_transaction_builder_create();
 if (builder) {
+    // Set expiry using current chain height when available
+    neoc_rpc_client_t* rpc = NULL;
+    if (neoc_rpc_client_create("http://localhost:10332", &rpc) == NEOC_SUCCESS) {
+        neoc_transaction_builder_set_valid_until_block_from_rpc(builder, rpc, 1000);
+        neoc_rpc_client_free(rpc);
+    }
+
     // Add transfer
     neoc_hash160_t to_address;
     neoc_hash160_from_address(&to_address, "NQrFVj6NvW5z2wKb3m8X9pL1nR4sT7uY6v");
